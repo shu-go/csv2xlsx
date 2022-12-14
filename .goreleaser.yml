@@ -1,0 +1,52 @@
+project_name: csv2xlsx
+env:
+  - GO111MODULE=on
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - binary: csv2xlsx
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X main.Version={{.Version}}
+      - -X main.Revision={{.ShortCommit}}
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - windows
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - 386
+    hooks:
+      post: upx --lzma '{{ .Path }}'
+archives:
+  - name_template: '{{ .ProjectName }}_v{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+    replacements:
+      darwin: darwin
+      linux: linux
+      windows: windows
+      386: 386
+      amd64: amd64
+    format_overrides:
+      - goos: windows
+        format: zip
+release:
+  prerelease: auto
+changelog:
+  skip: false
+  filters:
+    exclude:
+    - '^test:'
+  groups:
+    - title: 'Features'
+      regexp: "^.*feat[(\\w)!]*:+.*$"
+      order: 0
+    - title: 'Bug fixes'
+      regexp: "^.*fix[(\\w)!]*:+.*$"
+      order: 1
+    - title: 'Others'
+      order: 999
