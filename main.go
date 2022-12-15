@@ -130,96 +130,101 @@ func (c globalCmd) Run(args []string) error {
 					return err
 				}
 			}
-		} else {
-			for i := len(columns); i < len(fields); i++ {
-				colName, err := excelize.ColumnNumberToName(i + 1)
+		}
+		if rindex <= c.Header-1 {
+			rindex++
+			continue
+		}
+
+		for i := len(columns); i < len(fields); i++ {
+			colName, err := excelize.ColumnNumberToName(i + 1)
+			if err != nil {
+				return err
+			}
+
+			col := column{Name: "#" + colName}
+			if i := columnHints.findByName(col.Name); i != -1 {
+				col = columnHints[i]
+			}
+			columns = append(columns, col)
+		}
+
+		for cindex, val := range fields {
+			g := columns[cindex]
+			//log.Print(g.Name, val, g.Type)
+
+			addr, err := excelize.CoordinatesToCellName(cindex+1, rindex+1)
+			if err != nil {
+				return fmt.Errorf("%v: %v\n", g.Name, err)
+			}
+			//log.Println(addr, g.Name, val)
+
+			if len(val) == 0 {
+				continue
+			}
+
+			if !c.GuessType {
+				err = x.SetCellValue(sheetName, addr, val)
 				if err != nil {
 					return err
 				}
 
-				col := column{Name: "#" + colName}
-				if i := columnHints.findByName(col.Name); i != -1 {
-					col = columnHints[i]
-				}
-				columns = append(columns, col)
+				continue
 			}
 
-			for cindex, val := range fields {
-				g := columns[cindex]
-				//log.Print(g.Name, val, g.Type)
+			typ, ival := c.guess(val, g, datePtns, timePtns)
 
-				addr, err := excelize.CoordinatesToCellName(cindex+1, rindex+1)
+			//log.Println(addr, g.Name, val, typ)
+
+			switch typ {
+			case typeText:
+				err = x.SetCellValue(sheetName, addr, val)
 				if err != nil {
-					return fmt.Errorf("%v: %v\n", g.Name, err)
-				}
-				//log.Println(addr, g.Name, val)
-
-				if len(val) == 0 {
-					continue
+					return err
 				}
 
-				if !c.GuessType {
-					err = x.SetCellValue(sheetName, addr, val)
-					if err != nil {
-						return err
-					}
-
-					continue
+			case typeDatetime:
+				//log.Println(addr, tvalue)
+				err = setCellValueAndStyle(x, sheetName, addr, ival, datetimeStyle)
+				if err != nil {
+					return err
 				}
 
-				typ, ival := c.guess(val, g, datePtns, timePtns)
-
-				//log.Println(addr, g.Name, val, typ)
-
-				switch typ {
-				case typeText:
-					err = x.SetCellValue(sheetName, addr, val)
-					if err != nil {
-						return err
-					}
-
-				case typeDatetime:
-					//log.Println(addr, tvalue)
-					err = setCellValueAndStyle(x, sheetName, addr, ival, datetimeStyle)
-					if err != nil {
-						return err
-					}
-
-				case typeDate:
-					//log.Println(addr, tvalue)
-					err = setCellValueAndStyle(x, sheetName, addr, ival, dateStyle)
-					if err != nil {
-						return err
-					}
-
-				case typeTime:
-					tval := ival.(time.Time)
-					if y, m, d := tval.Date(); y == 0 && m == 1 && d == 1 {
-						tval = time.Date(1900, 1, 1, tval.Hour(), tval.Minute(), tval.Second(), tval.Nanosecond(), tval.Location())
-					}
-					//log.Println(addr, tval)
-					err = setCellValueAndStyle(x, sheetName, addr, tval, timeStyle)
-					if err != nil {
-						return err
-					}
-
-				case typeNumber:
-					//log.Println(addr, fvalue)
-					err = x.SetCellValue(sheetName, addr, ival)
-					if err != nil {
-						return err
-					}
-
-				default:
-					err = x.SetCellValue(sheetName, addr, val)
-					if err != nil {
-						return err
-					}
+			case typeDate:
+				//log.Println(addr, tvalue)
+				err = setCellValueAndStyle(x, sheetName, addr, ival, dateStyle)
+				if err != nil {
+					return err
 				}
 
-				columns[cindex] = g
+			case typeTime:
+				tval := ival.(time.Time)
+				if y, m, d := tval.Date(); y == 0 && m == 1 && d == 1 {
+					tval = time.Date(1900, 1, 1, tval.Hour(), tval.Minute(), tval.Second(), tval.Nanosecond(), tval.Location())
+				}
+				//log.Println(addr, tval)
+				err = setCellValueAndStyle(x, sheetName, addr, tval, timeStyle)
+				if err != nil {
+					return err
+				}
+
+			case typeNumber:
+				//log.Println(addr, fvalue)
+				err = x.SetCellValue(sheetName, addr, ival)
+				if err != nil {
+					return err
+				}
+
+			default:
+				err = x.SetCellValue(sheetName, addr, val)
+				if err != nil {
+					return err
+				}
 			}
+
+			columns[cindex] = g
 		}
+
 		rindex++
 	}
 
