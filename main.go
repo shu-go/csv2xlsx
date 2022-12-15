@@ -232,6 +232,7 @@ func (c globalCmd) Run(args []string) error {
 		csvrindex++
 	}
 
+	x.DeleteSheet("Sheet1")
 	x.SetActiveSheet(1)
 	err = x.SaveAs(c.Output)
 	if err != nil {
