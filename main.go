@@ -70,23 +70,19 @@ func (c globalCmd) Run(args []string) error {
 
 	x := excelize.NewFile()
 
-	exp := c.DateXlsxFmt
-	dateStyle, err := x.NewStyle(&excelize.Style{CustomNumFmt: &exp})
+	dateStyle, err := defineStyle(x, c.DateXlsxFmt)
 	if err != nil {
 		return err
 	}
-	exp = c.TimeXlsxFmt
-	timeStyle, err := x.NewStyle(&excelize.Style{CustomNumFmt: &exp})
+	timeStyle, err := defineStyle(x, c.TimeXlsxFmt)
 	if err != nil {
 		return err
 	}
-	exp = c.DatetimeXlsxFmt
-	datetimeStyle, err := x.NewStyle(&excelize.Style{CustomNumFmt: &exp})
+	datetimeStyle, err := defineStyle(x, c.DatetimeXlsxFmt)
 	if err != nil {
 		return err
 	}
-	exp = c.NumberXlsxFmt
-	numberStyle, err := x.NewStyle(&excelize.Style{CustomNumFmt: &exp})
+	numberStyle, err := defineStyle(x, c.NumberXlsxFmt)
 	if err != nil {
 		return err
 	}
@@ -387,6 +383,14 @@ func translateTimePatterns(ptn string) []string {
 		ptns = append(ptns, ptn)
 	}
 	return ptns
+}
+
+func defineStyle(f *excelize.File, s string) (int, error) {
+	if s == "" {
+		return f.NewStyle(&excelize.Style{NumFmt: 0})
+	}
+
+	return f.NewStyle(&excelize.Style{CustomNumFmt: &s})
 }
 
 func setCellValueAndStyle(f *excelize.File, sheet, axis string, value interface{}, styleID int) error {
