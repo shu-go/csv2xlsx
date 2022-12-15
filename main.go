@@ -167,85 +167,7 @@ func (c globalCmd) Run(args []string) error {
 					continue
 				}
 
-				typ := colType("")
-				var fvalue float64
-				var tvalue time.Time
-
-				guessed := false
-				switch g.Type {
-				case typeText:
-					guessed = true
-					typ = typeText
-
-				case typeNumber:
-					if f, err := strconv.ParseFloat(val, 64); err == nil {
-						guessed = true
-						typ = typeNumber
-						fvalue = f
-					}
-
-				case typeDate:
-					var ptns []string = translateDatePatterns(g.InputFormat)
-					if t, ok := parseTime(val, ptns...); ok {
-						guessed = true
-						typ = typeDate
-						tvalue = t
-					}
-
-				case typeTime:
-					var ptns []string = translateTimePatterns(g.InputFormat)
-					if t, ok := parseTime(val, ptns...); ok {
-						guessed = true
-						typ = typeTime
-						tvalue = t
-					}
-
-				case typeDatetime:
-					if t, ok := parseTime(val, g.InputFormat); ok {
-						guessed = true
-						typ = typeDatetime
-						tvalue = t
-					}
-
-				default: // nop
-				}
-
-				if !guessed && val[0] == '\'' {
-					guessed = true
-					typ = typeText
-				}
-				if !guessed && val[0] == '0' {
-					guessed = true
-					typ = typeText
-				}
-				if !guessed {
-					if t, ok := parseTime(val, c.DatetimeFmt); ok {
-						guessed = true
-						typ = typeDatetime
-						tvalue = t
-					}
-				}
-				if !guessed {
-					if t, ok := parseTime(val, datePtns...); ok {
-						guessed = true
-						typ = typeDate
-						tvalue = t
-					}
-				}
-				if !guessed {
-					if t, ok := parseTime(val, timePtns...); ok {
-						guessed = true
-						typ = typeTime
-						tvalue = t
-					}
-				}
-				if !guessed {
-					if f, err := strconv.ParseFloat(val, 64); err == nil {
-						guessed = true
-						typ = typeNumber
-						fvalue = f
-					}
-				}
+				typ, ival := c.guess(val, g, datePtns, timePtns)
 
 				//log.Println(addr, g.Name, val, typ)
 
@@ -257,31 +179,32 @@ func (c globalCmd) Run(args []string) error {
 
 				} else if typ == typeDatetime {
 					//log.Println(addr, tvalue)
-					err = setCellValueAndStyle(x, sheetName, addr, tvalue, datetimeStyle)
+					err = setCellValueAndStyle(x, sheetName, addr, ival, datetimeStyle)
 					if err != nil {
 						return err
 					}
 
 				} else if typ == typeDate {
 					//log.Println(addr, tvalue)
-					err = setCellValueAndStyle(x, sheetName, addr, tvalue, dateStyle)
+					err = setCellValueAndStyle(x, sheetName, addr, ival, dateStyle)
 					if err != nil {
 						return err
 					}
 
 				} else if typ == typeTime {
-					if y, m, d := tvalue.Date(); y == 0 && m == 1 && d == 1 {
-						tvalue = time.Date(1900, 1, 1, tvalue.Hour(), tvalue.Minute(), tvalue.Second(), tvalue.Nanosecond(), tvalue.Location())
+					tval := ival.(time.Time)
+					if y, m, d := tval.Date(); y == 0 && m == 1 && d == 1 {
+						tval = time.Date(1900, 1, 1, tval.Hour(), tval.Minute(), tval.Second(), tval.Nanosecond(), tval.Location())
 					}
-					//log.Println(addr, tvalue)
-					err = setCellValueAndStyle(x, sheetName, addr, tvalue, timeStyle)
+					//log.Println(addr, tval)
+					err = setCellValueAndStyle(x, sheetName, addr, tval, timeStyle)
 					if err != nil {
 						return err
 					}
 
 				} else if typ == typeNumber {
 					//log.Println(addr, fvalue)
-					err = x.SetCellValue(sheetName, addr, fvalue)
+					err = x.SetCellValue(sheetName, addr, ival)
 					if err != nil {
 						return err
 					}
@@ -306,6 +229,58 @@ func (c globalCmd) Run(args []string) error {
 	}
 
 	return nil
+}
+
+func (c globalCmd) guess(value string, col column, dateLayouts, timeLayouts []string) (colType, interface{}) {
+	switch col.Type {
+	case typeText:
+		return typeText, value
+
+	case typeNumber:
+		if f, err := strconv.ParseFloat(value, 64); err == nil {
+			return typeNumber, f
+		}
+
+	case typeDate:
+		var ptns []string = translateDatePatterns(col.InputFormat)
+		if t, ok := parseTime(value, ptns...); ok {
+			return typeDate, t
+		}
+
+	case typeTime:
+		var ptns []string = translateTimePatterns(col.InputFormat)
+		if t, ok := parseTime(value, ptns...); ok {
+			return typeTime, t
+		}
+
+	case typeDatetime:
+		if t, ok := parseTime(value, col.InputFormat); ok {
+			return typeDatetime, t
+		}
+
+	default: // nop
+	}
+
+	if value[0] == '\'' {
+		return typeText, value
+	}
+	if value[0] == '0' {
+		return typeText, value
+	}
+	if t, ok := parseTime(value, c.DatetimeFmt); ok {
+		return typeDatetime, t
+	}
+	if t, ok := parseTime(value, dateLayouts...); ok {
+		return typeDate, t
+	}
+	if t, ok := parseTime(value, timeLayouts...); ok {
+		return typeTime, t
+	}
+	if f, err := strconv.ParseFloat(value, 64); err == nil {
+		return typeNumber, f
+	}
+
+	return typeUnknown, value
 }
 
 func parseTime(value string, layouts ...string) (time.Time, bool) {
