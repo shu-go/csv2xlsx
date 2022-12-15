@@ -99,7 +99,8 @@ func (c globalCmd) Run(args []string) error {
 	var timePtns []string = translateTimePatterns(c.TimeFmt)
 
 	r := csv.NewReader(f)
-	rindex := 0
+	csvrindex := 0
+	xlsxrindex := 0
 	columns := columns{}
 
 	for {
@@ -112,7 +113,7 @@ func (c globalCmd) Run(args []string) error {
 			return err
 		}
 
-		if rindex == c.Header-1 {
+		if csvrindex == c.Header-1 {
 			for cindex, val := range fields {
 				//log.Printf("%v:%v\n", cindex, val)
 				col := column{Name: strings.TrimSpace(val)}
@@ -121,7 +122,7 @@ func (c globalCmd) Run(args []string) error {
 				}
 				columns = append(columns, col)
 
-				addr, err := excelize.CoordinatesToCellName(cindex+1, rindex+1)
+				addr, err := excelize.CoordinatesToCellName(cindex+1, xlsxrindex+1)
 				if err != nil {
 					return err
 				}
@@ -130,9 +131,10 @@ func (c globalCmd) Run(args []string) error {
 					return err
 				}
 			}
+			xlsxrindex++
 		}
-		if rindex <= c.Header-1 {
-			rindex++
+		if csvrindex <= c.Header-1 {
+			csvrindex++
 			continue
 		}
 
@@ -153,7 +155,7 @@ func (c globalCmd) Run(args []string) error {
 			g := columns[cindex]
 			//log.Print(g.Name, val, g.Type)
 
-			addr, err := excelize.CoordinatesToCellName(cindex+1, rindex+1)
+			addr, err := excelize.CoordinatesToCellName(cindex+1, xlsxrindex+1)
 			if err != nil {
 				return fmt.Errorf("%v: %v\n", g.Name, err)
 			}
@@ -223,7 +225,8 @@ func (c globalCmd) Run(args []string) error {
 			}
 		}
 
-		rindex++
+		xlsxrindex++
+		csvrindex++
 	}
 
 	x.SetActiveSheet(1)
