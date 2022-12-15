@@ -46,26 +46,24 @@ func (c globalCmd) Run(args []string) error {
 		return errors.New("--output is required")
 	}
 
-	var columnHints Columns
+	var columnHints columns
 	hintRE := regexp.MustCompile(`(text|number|date|time|datetime)(\((.+)\))?`)
-	if len(c.Columns) != 0 {
-		for k, v := range c.Columns {
-			subs := hintRE.FindStringSubmatch(v)
-			if subs == nil {
-				return fmt.Errorf("a value of --columns is invalid: %q:%q", k, v)
-			}
-
-			col := Column{Name: k, Type: ColType(subs[1]), InputFormat: strings.TrimSpace(subs[3])}
-			if col.Type == TypeDate && col.InputFormat == "" {
-				col.InputFormat = c.DateFmt
-			} else if col.Type == TypeTime && col.InputFormat == "" {
-				col.InputFormat = c.TimeFmt
-			} else if col.Type == TypeDatetime && col.InputFormat == "" {
-				col.InputFormat = c.DatetimeFmt
-			}
-
-			columnHints = append(columnHints, col)
+	for k, v := range c.Columns {
+		subs := hintRE.FindStringSubmatch(v)
+		if subs == nil {
+			return fmt.Errorf("a value of --columns is invalid: %q:%q", k, v)
 		}
+
+		col := column{Name: k, Type: colType(subs[1]), InputFormat: strings.TrimSpace(subs[3])}
+		if col.Type == typeDate && col.InputFormat == "" {
+			col.InputFormat = c.DateFmt
+		} else if col.Type == typeTime && col.InputFormat == "" {
+			col.InputFormat = c.TimeFmt
+		} else if col.Type == typeDatetime && col.InputFormat == "" {
+			col.InputFormat = c.DatetimeFmt
+		}
+
+		columnHints = append(columnHints, col)
 	}
 
 	x := excelize.NewFile()
@@ -102,7 +100,7 @@ func (c globalCmd) Run(args []string) error {
 
 	r := csv.NewReader(f)
 	rindex := 0
-	columns := Columns{}
+	columns := columns{}
 
 	for {
 		fields, err := r.Read()
@@ -117,8 +115,8 @@ func (c globalCmd) Run(args []string) error {
 		if rindex == c.Header-1 {
 			for cindex, val := range fields {
 				//log.Printf("%v:%v\n", cindex, val)
-				col := Column{Name: strings.TrimSpace(val)}
-				if i := columnHints.FindByName(col.Name); i != -1 {
+				col := column{Name: strings.TrimSpace(val)}
+				if i := columnHints.findByName(col.Name); i != -1 {
 					col = columnHints[i]
 				}
 				columns = append(columns, col)
@@ -127,7 +125,10 @@ func (c globalCmd) Run(args []string) error {
 				if err != nil {
 					return err
 				}
-				x.SetCellValue(sheetName, addr, val)
+				err = x.SetCellValue(sheetName, addr, val)
+				if err != nil {
+					return err
+				}
 			}
 		} else {
 			for i := len(columns); i < len(fields); i++ {
@@ -136,8 +137,8 @@ func (c globalCmd) Run(args []string) error {
 					return err
 				}
 
-				col := Column{Name: "#" + colName}
-				if i := columnHints.FindByName(col.Name); i != -1 {
+				col := column{Name: "#" + colName}
+				if i := columnHints.findByName(col.Name); i != -1 {
 					col = columnHints[i]
 				}
 				columns = append(columns, col)
@@ -158,54 +159,51 @@ func (c globalCmd) Run(args []string) error {
 				}
 
 				if !c.GuessType {
-					x.SetCellValue(sheetName, addr, val)
+					err = x.SetCellValue(sheetName, addr, val)
+					if err != nil {
+						return err
+					}
 
 					continue
 				}
 
-				typ := ColType("")
+				typ := colType("")
 				var fvalue float64
 				var tvalue time.Time
 
 				guessed := false
 				switch g.Type {
-				case TypeText:
+				case typeText:
 					guessed = true
-					typ = TypeText
+					typ = typeText
 
-				case TypeNumber:
+				case typeNumber:
 					if f, err := strconv.ParseFloat(val, 64); err == nil {
 						guessed = true
-						typ = TypeNumber
+						typ = typeNumber
 						fvalue = f
 					}
 
-				case TypeDate:
+				case typeDate:
 					var ptns []string = translateDatePatterns(g.InputFormat)
-					for _, ptn := range ptns {
-						if t, err := time.Parse(ptn, val); err == nil {
-							guessed = true
-							typ = TypeDate
-							tvalue = t
-							break
-						}
-					}
-
-				case TypeTime:
-					var ptns []string = translateTimePatterns(g.InputFormat)
-					for _, ptn := range ptns {
-						if t, err := time.Parse(ptn, val); err == nil {
-							guessed = true
-							typ = TypeTime
-							tvalue = t
-							break
-						}
-					}
-
-				case TypeDatetime:
-					if t, err := time.Parse(g.InputFormat, val); err == nil {
+					if t, ok := parseTime(val, ptns...); ok {
 						guessed = true
-						typ = TypeDatetime
+						typ = typeDate
+						tvalue = t
+					}
+
+				case typeTime:
+					var ptns []string = translateTimePatterns(g.InputFormat)
+					if t, ok := parseTime(val, ptns...); ok {
+						guessed = true
+						typ = typeTime
+						tvalue = t
+					}
+
+				case typeDatetime:
+					if t, ok := parseTime(val, g.InputFormat); ok {
+						guessed = true
+						typ = typeDatetime
 						tvalue = t
 					}
 
@@ -214,82 +212,85 @@ func (c globalCmd) Run(args []string) error {
 
 				if !guessed && val[0] == '\'' {
 					guessed = true
-					typ = TypeText
+					typ = typeText
 				}
 				if !guessed && val[0] == '0' {
 					guessed = true
-					typ = TypeText
+					typ = typeText
 				}
 				if !guessed {
-					if t, err := time.Parse(c.DatetimeFmt, val); err == nil {
+					if t, ok := parseTime(val, c.DatetimeFmt); ok {
 						guessed = true
-						typ = TypeDatetime
+						typ = typeDatetime
 						tvalue = t
 					}
 				}
 				if !guessed {
-					for _, ptn := range datePtns {
-						if len(ptn) != len(val) {
-							continue
-						}
-						if t, err := time.Parse(ptn, val); err == nil {
-							guessed = true
-							typ = TypeDate
-							tvalue = t
-							break
-						}
+					if t, ok := parseTime(val, datePtns...); ok {
+						guessed = true
+						typ = typeDate
+						tvalue = t
 					}
 				}
 				if !guessed {
-					for _, ptn := range timePtns {
-						if len(ptn) != len(val) {
-							continue
-						}
-						if t, err := time.Parse(ptn, val); err == nil {
-							guessed = true
-							typ = TypeTime
-							tvalue = t
-							break
-						}
+					if t, ok := parseTime(val, timePtns...); ok {
+						guessed = true
+						typ = typeTime
+						tvalue = t
 					}
 				}
 				if !guessed {
 					if f, err := strconv.ParseFloat(val, 64); err == nil {
 						guessed = true
-						typ = TypeNumber
+						typ = typeNumber
 						fvalue = f
 					}
 				}
 
 				//log.Println(addr, g.Name, val, typ)
 
-				if typ == TypeText {
-					x.SetCellValue(sheetName, addr, val)
+				if typ == typeText {
+					err = x.SetCellValue(sheetName, addr, val)
+					if err != nil {
+						return err
+					}
 
-				} else if typ == TypeDatetime {
+				} else if typ == typeDatetime {
 					//log.Println(addr, tvalue)
-					x.SetCellValue(sheetName, addr, tvalue)
-					x.SetCellStyle(sheetName, addr, addr, datetimeStyle)
+					err = setCellValueAndStyle(x, sheetName, addr, tvalue, datetimeStyle)
+					if err != nil {
+						return err
+					}
 
-				} else if typ == TypeDate {
+				} else if typ == typeDate {
 					//log.Println(addr, tvalue)
-					x.SetCellValue(sheetName, addr, tvalue)
-					x.SetCellStyle(sheetName, addr, addr, dateStyle)
+					err = setCellValueAndStyle(x, sheetName, addr, tvalue, dateStyle)
+					if err != nil {
+						return err
+					}
 
-				} else if typ == TypeTime {
+				} else if typ == typeTime {
 					if y, m, d := tvalue.Date(); y == 0 && m == 1 && d == 1 {
 						tvalue = time.Date(1900, 1, 1, tvalue.Hour(), tvalue.Minute(), tvalue.Second(), tvalue.Nanosecond(), tvalue.Location())
 					}
 					//log.Println(addr, tvalue)
-					x.SetCellValue(sheetName, addr, tvalue)
-					x.SetCellStyle(sheetName, addr, addr, timeStyle)
+					err = setCellValueAndStyle(x, sheetName, addr, tvalue, timeStyle)
+					if err != nil {
+						return err
+					}
 
-				} else if typ == TypeNumber {
+				} else if typ == typeNumber {
 					//log.Println(addr, fvalue)
-					x.SetCellValue(sheetName, addr, fvalue)
+					err = x.SetCellValue(sheetName, addr, fvalue)
+					if err != nil {
+						return err
+					}
 
 				} else {
-					x.SetCellValue(sheetName, addr, val)
+					err = x.SetCellValue(sheetName, addr, val)
+					if err != nil {
+						return err
+					}
 				}
 
 				columns[cindex] = g
@@ -307,6 +308,19 @@ func (c globalCmd) Run(args []string) error {
 	return nil
 }
 
+func parseTime(value string, layouts ...string) (time.Time, bool) {
+	for i := range layouts {
+		if len(layouts[i]) != len(value) {
+			continue
+		}
+
+		if t, err := time.Parse(layouts[i], value); err == nil {
+			return t, true
+		}
+	}
+	return time.Time{}, false
+}
+
 func translateDatePatterns(ptn string) []string {
 	var ptns []string
 	if strings.ContainsAny(ptn, "ymd") {
@@ -317,6 +331,13 @@ func translateDatePatterns(ptn string) []string {
 			p := ptn
 			p = strings.ReplaceAll(p, "yy", "2006")
 			p = strings.ReplaceAll(p, "y", "2006")
+			p = strings.ReplaceAll(p, "m", "01")
+			p = strings.ReplaceAll(p, "d", "02")
+			ptns = append(ptns, p)
+
+			p = ptn
+			p = strings.ReplaceAll(p, "yy", "06")
+			p = strings.ReplaceAll(p, "y", "06")
 			p = strings.ReplaceAll(p, "m", "01")
 			p = strings.ReplaceAll(p, "d", "02")
 			ptns = append(ptns, p)
@@ -377,6 +398,20 @@ func translateTimePatterns(ptn string) []string {
 		ptns = append(ptns, ptn)
 	}
 	return ptns
+}
+
+func setCellValueAndStyle(f *excelize.File, sheet, axis string, value interface{}, styleID int) error {
+	err := f.SetCellValue(sheet, axis, value)
+	if err != nil {
+		return err
+	}
+
+	err = f.SetCellStyle(sheet, axis, axis, styleID)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func main() {

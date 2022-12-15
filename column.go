@@ -2,15 +2,15 @@ package main
 
 import "strings"
 
-type Columns []Column
+type columns []column
 
-type Column struct {
+type column struct {
 	Name        string  `json:"name,omitempty"`
-	Type        ColType `json:"type,omitempty"`
+	Type        colType `json:"type,omitempty"`
 	InputFormat string  `json:"format,omitempty"`
 }
 
-func (cc Columns) FindByName(name string) int {
+func (cc columns) findByName(name string) int {
 	if cc == nil {
 		return -1
 	}
@@ -23,13 +23,13 @@ func (cc Columns) FindByName(name string) int {
 	return -1
 }
 
-type ColType string
+type colType string
 
 const (
-	TypeUnknown  ColType = ""
-	TypeText             = "text"
-	TypeNumber           = "number"
-	TypeDate             = "date"
-	TypeTime             = "time"
-	TypeDatetime         = "datetime"
+	typeUnknown  colType = ""
+	typeText     colType = "text"
+	typeNumber   colType = "number"
+	typeDate     colType = "date"
+	typeTime     colType = "time"
+	typeDatetime colType = "datetime"
 )
