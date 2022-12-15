@@ -171,27 +171,28 @@ func (c globalCmd) Run(args []string) error {
 
 				//log.Println(addr, g.Name, val, typ)
 
-				if typ == typeText {
+				switch typ {
+				case typeText:
 					err = x.SetCellValue(sheetName, addr, val)
 					if err != nil {
 						return err
 					}
 
-				} else if typ == typeDatetime {
+				case typeDatetime:
 					//log.Println(addr, tvalue)
 					err = setCellValueAndStyle(x, sheetName, addr, ival, datetimeStyle)
 					if err != nil {
 						return err
 					}
 
-				} else if typ == typeDate {
+				case typeDate:
 					//log.Println(addr, tvalue)
 					err = setCellValueAndStyle(x, sheetName, addr, ival, dateStyle)
 					if err != nil {
 						return err
 					}
 
-				} else if typ == typeTime {
+				case typeTime:
 					tval := ival.(time.Time)
 					if y, m, d := tval.Date(); y == 0 && m == 1 && d == 1 {
 						tval = time.Date(1900, 1, 1, tval.Hour(), tval.Minute(), tval.Second(), tval.Nanosecond(), tval.Location())
@@ -202,14 +203,14 @@ func (c globalCmd) Run(args []string) error {
 						return err
 					}
 
-				} else if typ == typeNumber {
+				case typeNumber:
 					//log.Println(addr, fvalue)
 					err = x.SetCellValue(sheetName, addr, ival)
 					if err != nil {
 						return err
 					}
 
-				} else {
+				default:
 					err = x.SetCellValue(sheetName, addr, val)
 					if err != nil {
 						return err
