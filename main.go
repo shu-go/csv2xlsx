@@ -221,8 +221,6 @@ func (c globalCmd) Run(args []string) error {
 					return err
 				}
 			}
-
-			columns[cindex] = g
 		}
 
 		rindex++
