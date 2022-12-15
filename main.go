@@ -38,6 +38,8 @@ type globalCmd struct {
 	TimeXlsxFmt     string `cli:"time-xlsx,txf" default:"hh:mm:ss" help:"global output format of time over columns"`
 	DatetimeXlsxFmt string `cli:"datetime-xlsx,dtxf" default:"yyyy/mm/dd hh:mm:ss" help:"global output format of datetime over columns"`
 
+	NumberXlsxFmt string `cli:"number-xlsx,nxf" default:""`
+
 	Columns gli.Map `cli:"columns,cols" help:""`
 }
 
@@ -80,6 +82,11 @@ func (c globalCmd) Run(args []string) error {
 	}
 	exp = c.DatetimeXlsxFmt
 	datetimeStyle, err := x.NewStyle(&excelize.Style{CustomNumFmt: &exp})
+	if err != nil {
+		return err
+	}
+	exp = c.NumberXlsxFmt
+	numberStyle, err := x.NewStyle(&excelize.Style{CustomNumFmt: &exp})
 	if err != nil {
 		return err
 	}
@@ -212,7 +219,7 @@ func (c globalCmd) Run(args []string) error {
 
 			case typeNumber:
 				//log.Println(addr, fvalue)
-				err = x.SetCellValue(sheetName, addr, ival)
+				err = setCellValueAndStyle(x, sheetName, addr, ival, numberStyle)
 				if err != nil {
 					return err
 				}
