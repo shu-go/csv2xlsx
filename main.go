@@ -181,50 +181,9 @@ func (c globalCmd) Run(args []string) error {
 
 			//log.Println(addr, g.Name, val, typ)
 
-			switch typ {
-			case typeText:
-				err = x.SetCellValue(sheetName, addr, val)
-				if err != nil {
-					return err
-				}
-
-			case typeDatetime:
-				//log.Println(addr, tvalue)
-				err = setCellValueAndStyle(x, sheetName, addr, ival, datetimeStyle)
-				if err != nil {
-					return err
-				}
-
-			case typeDate:
-				//log.Println(addr, tvalue)
-				err = setCellValueAndStyle(x, sheetName, addr, ival, dateStyle)
-				if err != nil {
-					return err
-				}
-
-			case typeTime:
-				tval := ival.(time.Time)
-				if y, m, d := tval.Date(); y == 0 && m == 1 && d == 1 {
-					tval = time.Date(1900, 1, 1, tval.Hour(), tval.Minute(), tval.Second(), tval.Nanosecond(), tval.Location())
-				}
-				//log.Println(addr, tval)
-				err = setCellValueAndStyle(x, sheetName, addr, tval, timeStyle)
-				if err != nil {
-					return err
-				}
-
-			case typeNumber:
-				//log.Println(addr, fvalue)
-				err = setCellValueAndStyle(x, sheetName, addr, ival, numberStyle)
-				if err != nil {
-					return err
-				}
-
-			default:
-				err = x.SetCellValue(sheetName, addr, val)
-				if err != nil {
-					return err
-				}
+			err = writeXlsx(x, sheetName, addr, typ, ival, numberStyle, dateStyle, timeStyle, datetimeStyle)
+			if err != nil {
+				return err
 			}
 		}
 
@@ -242,7 +201,82 @@ func (c globalCmd) Run(args []string) error {
 	return nil
 }
 
+func writeXlsx(f *excelize.File, sheet string, axis string, typ colType, value interface{}, numberStyle, dateStyle, timeStyle, datetimeStyle int) error {
+	switch typ {
+	case typeText:
+		err := f.SetCellValue(sheet, axis, value)
+		if err != nil {
+			return err
+		}
+
+	case typeDatetime:
+		//log.Println(axis, value)
+		err := setCellValueAndStyle(f, sheet, axis, value, datetimeStyle)
+		if err != nil {
+			return err
+		}
+
+	case typeDate:
+		//log.Println(axis, value)
+		err := setCellValueAndStyle(f, sheet, axis, value, dateStyle)
+		if err != nil {
+			return err
+		}
+
+	case typeTime:
+		tval := value.(time.Time)
+		if y, m, d := tval.Date(); y == 0 && m == 1 && d == 1 {
+			tval = time.Date(1900, 1, 1, tval.Hour(), tval.Minute(), tval.Second(), tval.Nanosecond(), tval.Location())
+		}
+		//log.Println(axis, tval)
+		err := setCellValueAndStyle(f, sheet, axis, tval, timeStyle)
+		if err != nil {
+			return err
+		}
+
+	case typeNumber:
+		//log.Println(axis, value)
+		err := setCellValueAndStyle(f, sheet, axis, value, numberStyle)
+		if err != nil {
+			return err
+		}
+
+	default:
+		err := f.SetCellValue(sheet, axis, value)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (c globalCmd) guess(value string, col column, dateLayouts, timeLayouts []string) (colType, interface{}) {
+	typ, ival := c.guessByColType(value, col)
+	if typ != typeUnknown {
+		return typ, ival
+	}
+
+	if value[0] == '\'' || value[0] == '0' {
+		return typeText, value
+	}
+	if t, ok := parseTime(value, c.DatetimeFmt); ok {
+		return typeDatetime, t
+	}
+	if t, ok := parseTime(value, dateLayouts...); ok {
+		return typeDate, t
+	}
+	if t, ok := parseTime(value, timeLayouts...); ok {
+		return typeTime, t
+	}
+	if f, err := strconv.ParseFloat(value, 64); err == nil {
+		return typeNumber, f
+	}
+
+	return typeUnknown, value
+}
+
+func (c globalCmd) guessByColType(value string, col column) (colType, interface{}) {
 	switch col.Type {
 	case typeText:
 		return typeText, value
@@ -270,25 +304,6 @@ func (c globalCmd) guess(value string, col column, dateLayouts, timeLayouts []st
 		}
 
 	default: // nop
-	}
-
-	if value[0] == '\'' {
-		return typeText, value
-	}
-	if value[0] == '0' {
-		return typeText, value
-	}
-	if t, ok := parseTime(value, c.DatetimeFmt); ok {
-		return typeDatetime, t
-	}
-	if t, ok := parseTime(value, dateLayouts...); ok {
-		return typeDate, t
-	}
-	if t, ok := parseTime(value, timeLayouts...); ok {
-		return typeTime, t
-	}
-	if f, err := strconv.ParseFloat(value, 64); err == nil {
-		return typeNumber, f
 	}
 
 	return typeUnknown, value
