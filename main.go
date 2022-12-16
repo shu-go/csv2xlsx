@@ -117,23 +117,20 @@ func (c globalCmd) Run(args []string) error {
 		}
 
 		if csvrindex == c.Header-1 {
-			for cindex, val := range fields {
-				//log.Printf("%v:%v\n", cindex, val)
-				col := column{Name: strings.TrimSpace(val)}
+			for cindex := range fields {
+				//log.Printf("%v:%v\n", cindex, fields[cindex])
+				col := column{Name: strings.TrimSpace(fields[cindex])}
 				if i := columnHints.findByName(col.Name); i != -1 {
 					col = columnHints[i]
 				}
 				columns = append(columns, col)
-
-				addr, err := excelize.CoordinatesToCellName(cindex+1, xlsxrindex+1)
-				if err != nil {
-					return err
-				}
-				err = x.SetCellValue(sheetName, addr, val)
-				if err != nil {
-					return err
-				}
 			}
+
+			err := writeXlsxHeader(x, sheetName, xlsxrindex, fields)
+			if err != nil {
+				return err
+			}
+
 			xlsxrindex++
 		}
 		if csvrindex <= c.Header-1 {
@@ -198,6 +195,20 @@ func (c globalCmd) Run(args []string) error {
 		return err
 	}
 
+	return nil
+}
+
+func writeXlsxHeader(f *excelize.File, sheet string, rindex int, fields []string) error {
+	for cindex, value := range fields {
+		addr, err := excelize.CoordinatesToCellName(cindex+1, rindex+1)
+		if err != nil {
+			return err
+		}
+		err = f.SetCellValue(sheet, addr, value)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
