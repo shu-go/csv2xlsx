@@ -151,22 +151,22 @@ func (c globalCmd) Run(args []string) error {
 			columns = append(columns, col)
 		}
 
-		for cindex, val := range fields {
+		for cindex, value := range fields {
 			g := columns[cindex]
-			//log.Print(g.Name, val, g.Type)
+			//log.Print(g.Name, value, g.Type)
 
 			addr, err := excelize.CoordinatesToCellName(cindex+1, xlsxrindex+1)
 			if err != nil {
 				return fmt.Errorf("%v: %v\n", g.Name, err)
 			}
-			//log.Println(addr, g.Name, val)
+			//log.Println(addr, g.Name, value)
 
-			if len(val) == 0 {
+			if len(value) == 0 {
 				continue
 			}
 
 			if !c.GuessType {
-				err = x.SetCellValue(sheetName, addr, val)
+				err = x.SetCellValue(sheetName, addr, value)
 				if err != nil {
 					return err
 				}
@@ -174,9 +174,9 @@ func (c globalCmd) Run(args []string) error {
 				continue
 			}
 
-			typ, ival := c.guess(val, g, datePtns, timePtns)
+			typ, ival := c.guess(value, g, datePtns, timePtns)
 
-			//log.Println(addr, g.Name, val, typ)
+			//log.Println(addr, g.Name, value, typ)
 
 			err = writeXlsx(x, sheetName, addr, typ, ival, numberStyle, dateStyle, timeStyle, datetimeStyle)
 			if err != nil {
