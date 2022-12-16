@@ -68,21 +68,21 @@ func (c globalCmd) Run(args []string) error {
 		columnHints = append(columnHints, col)
 	}
 
-	x := excelize.NewFile()
+	xlsxfile := excelize.NewFile()
 
-	dateStyle, err := defineStyle(x, c.DateXlsxFmt)
+	dateStyle, err := defineStyle(xlsxfile, c.DateXlsxFmt)
 	if err != nil {
 		return err
 	}
-	timeStyle, err := defineStyle(x, c.TimeXlsxFmt)
+	timeStyle, err := defineStyle(xlsxfile, c.TimeXlsxFmt)
 	if err != nil {
 		return err
 	}
-	datetimeStyle, err := defineStyle(x, c.DatetimeXlsxFmt)
+	datetimeStyle, err := defineStyle(xlsxfile, c.DatetimeXlsxFmt)
 	if err != nil {
 		return err
 	}
-	numberStyle, err := defineStyle(x, c.NumberXlsxFmt)
+	numberStyle, err := defineStyle(xlsxfile, c.NumberXlsxFmt)
 	if err != nil {
 		return err
 	}
@@ -90,18 +90,18 @@ func (c globalCmd) Run(args []string) error {
 	csvFileName := args[0]
 	sheetName := filepath.Base(csvFileName)
 
-	f, err := os.Open(csvFileName)
+	csvfile, err := os.Open(csvFileName)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer csvfile.Close()
 
-	x.NewSheet(sheetName)
+	xlsxfile.NewSheet(sheetName)
 
 	var datePtns []string = translateDatePatterns(c.DateFmt)
 	var timePtns []string = translateTimePatterns(c.TimeFmt)
 
-	r := csv.NewReader(f)
+	r := csv.NewReader(csvfile)
 	csvrindex := 0
 	xlsxrindex := 0
 	columns := columns{}
@@ -126,7 +126,7 @@ func (c globalCmd) Run(args []string) error {
 				columns = append(columns, col)
 			}
 
-			err := writeXlsxHeader(x, sheetName, xlsxrindex, fields)
+			err := writeXlsxHeader(xlsxfile, sheetName, xlsxrindex, fields)
 			if err != nil {
 				return err
 			}
@@ -166,7 +166,7 @@ func (c globalCmd) Run(args []string) error {
 			}
 
 			if !c.GuessType {
-				err = x.SetCellValue(sheetName, addr, value)
+				err = xlsxfile.SetCellValue(sheetName, addr, value)
 				if err != nil {
 					return err
 				}
@@ -178,7 +178,7 @@ func (c globalCmd) Run(args []string) error {
 
 			//log.Println(addr, g.Name, value, typ)
 
-			err = writeXlsx(x, sheetName, addr, typ, ival, numberStyle, dateStyle, timeStyle, datetimeStyle)
+			err = writeXlsx(xlsxfile, sheetName, addr, typ, ival, numberStyle, dateStyle, timeStyle, datetimeStyle)
 			if err != nil {
 				return err
 			}
@@ -188,9 +188,9 @@ func (c globalCmd) Run(args []string) error {
 		csvrindex++
 	}
 
-	x.DeleteSheet("Sheet1")
-	x.SetActiveSheet(1)
-	err = x.SaveAs(c.Output)
+	xlsxfile.DeleteSheet("Sheet1")
+	xlsxfile.SetActiveSheet(1)
+	err = xlsxfile.SaveAs(c.Output)
 	if err != nil {
 		return err
 	}
