@@ -5,9 +5,9 @@ import "strings"
 type columns []column
 
 type column struct {
-	Name        string  `json:"name,omitempty"`
-	Type        colType `json:"type,omitempty"`
-	InputFormat string  `json:"format,omitempty"`
+	Name        string
+	Type        colType
+	InputFormat string
 }
 
 func (cc columns) findByName(name string) int {
