@@ -13,8 +13,6 @@ import (
 
 	"encoding/csv"
 
-	//csv "github.com/JensRantil/go-csv"
-
 	"github.com/shu-go/gli"
 	"github.com/xuri/excelize/v2"
 )
@@ -108,9 +106,7 @@ func (c globalCmd) Run(args []string) error {
 
 	for {
 		fields, err := r.Read()
-		//log.Println(fields)
 		if err == io.EOF {
-			//log.Println("EOF")
 			break
 		} else if err != nil {
 			return err
@@ -118,7 +114,6 @@ func (c globalCmd) Run(args []string) error {
 
 		if csvrindex == c.Header-1 {
 			for cindex := range fields {
-				//log.Printf("%v:%v\n", cindex, fields[cindex])
 				col := column{Name: strings.TrimSpace(fields[cindex])}
 				if i := columnHints.findByName(col.Name); i != -1 {
 					col = columnHints[i]
@@ -153,13 +148,11 @@ func (c globalCmd) Run(args []string) error {
 
 		for cindex, value := range fields {
 			g := columns[cindex]
-			//log.Print(g.Name, value, g.Type)
 
 			addr, err := excelize.CoordinatesToCellName(cindex+1, xlsxrindex+1)
 			if err != nil {
 				return fmt.Errorf("%v: %v\n", g.Name, err)
 			}
-			//log.Println(addr, g.Name, value)
 
 			if len(value) == 0 {
 				continue
@@ -176,7 +169,6 @@ func (c globalCmd) Run(args []string) error {
 
 			typ, ival := c.guess(value, g, datePtns, timePtns)
 
-			//log.Println(addr, g.Name, value, typ)
 
 			err = writeXlsx(xlsxfile, sheetName, addr, typ, ival, numberStyle, dateStyle, timeStyle, datetimeStyle)
 			if err != nil {
@@ -221,14 +213,12 @@ func writeXlsx(f *excelize.File, sheet string, axis string, typ colType, value i
 		}
 
 	case typeDatetime:
-		//log.Println(axis, value)
 		err := setCellValueAndStyle(f, sheet, axis, value, datetimeStyle)
 		if err != nil {
 			return err
 		}
 
 	case typeDate:
-		//log.Println(axis, value)
 		err := setCellValueAndStyle(f, sheet, axis, value, dateStyle)
 		if err != nil {
 			return err
@@ -239,14 +229,12 @@ func writeXlsx(f *excelize.File, sheet string, axis string, typ colType, value i
 		if y, m, d := tval.Date(); y == 0 && m == 1 && d == 1 {
 			tval = time.Date(1900, 1, 1, tval.Hour(), tval.Minute(), tval.Second(), tval.Nanosecond(), tval.Location())
 		}
-		//log.Println(axis, tval)
 		err := setCellValueAndStyle(f, sheet, axis, tval, timeStyle)
 		if err != nil {
 			return err
 		}
 
 	case typeNumber:
-		//log.Println(axis, value)
 		err := setCellValueAndStyle(f, sheet, axis, value, numberStyle)
 		if err != nil {
 			return err
