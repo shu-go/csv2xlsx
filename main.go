@@ -38,7 +38,7 @@ type globalCmd struct {
 
 	NumberXlsxFmt string `cli:"number-xlsx,nxf" default:""`
 
-	Columns gli.Map `cli:"columns,cols" help:""`
+	Columns gli.Map `cli:"columns,cols" help:"[SHEET!]COLUMN_NAME:TYPE(INPUT_FORMAT),..."`
 }
 
 func (c globalCmd) Run(args []string) error {
@@ -468,9 +468,12 @@ func setCellValueAndStyle(f *excelize.File, sheet, axis string, value interface{
 func main() {
 	app := gli.NewWith(&globalCmd{})
 	app.Name = "csv2xlsx"
-	app.Desc = ""
+	app.Desc = "CSV to XLSX file converter"
 	app.Version = Version
-	app.Usage = `--columns COLUMN_NAME:TYPE(INPUT_FORMAT)
+	app.Usage = `csv2xlsx [options] -o FILENAME CSV_FILENAME [CSV_FILENAME...]
+
+--columns [SHEET!]COLUMN_NAME:TYPE(INPUT_FORMAT)
+  SHEET = CSV_FILENAME
   TYPE = [text|number|date|time|datetime]
   INPUT_FORMAT
     date: yyyy, yy, y, 2006, 06, mm, m, 01, 1, dd, d, 02, 2
