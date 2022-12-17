@@ -114,7 +114,7 @@ func (c globalCmd) Run(args []string) error {
 	}
 
 	xlsxfile.DeleteSheet("Sheet1")
-	xlsxfile.SetActiveSheet(1)
+	xlsxfile.SetActiveSheet(0)
 	err = xlsxfile.SaveAs(c.Output)
 	if err != nil {
 		return err
