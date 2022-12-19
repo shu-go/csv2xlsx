@@ -41,7 +41,7 @@ type globalCmd struct {
 	Columns gli.Map `cli:"columns,cols" help:"[SHEET!]COLUMN_NAME:TYPE(INPUT_FORMAT),..."`
 }
 
-func (c globalCmd) Run(args []string) error {
+func (c globalCmd) Before(args []string) error {
 	if c.Output == "" {
 		return errors.New("--output is required")
 	}
@@ -50,64 +50,21 @@ func (c globalCmd) Run(args []string) error {
 		return errors.New("at least one csv file is required")
 	}
 
-	var columnHints columns
-	hintRE := regexp.MustCompile(`(text|number|date|time|datetime)(:?\((.+)\))?`)
-	for k, v := range c.Columns {
-		subs := hintRE.FindStringSubmatch(v)
-		if subs == nil {
-			return fmt.Errorf("a value of --columns is invalid: %q:%q", k, v)
-		}
+	return nil
+}
 
-		col := newColumn(k, colType(subs[1]), strings.TrimSpace(subs[2]))
-		if col.Type == typeDate && col.InputFormat == "" {
-			col.InputFormat = c.DateFmt
-		} else if col.Type == typeTime && col.InputFormat == "" {
-			col.InputFormat = c.TimeFmt
-		} else if col.Type == typeDatetime && col.InputFormat == "" {
-			col.InputFormat = c.DatetimeFmt
-		}
-
-		columnHints = append(columnHints, col)
-	}
-
-	var datePtns []string = translateDatePatterns(c.DateFmt)
-	var timePtns []string = translateTimePatterns(c.TimeFmt)
-
+func (c globalCmd) Run(args []string) error {
 	xlsxfile := excelize.NewFile()
 
-	dateStyle, err := defineStyle(xlsxfile, c.DateXlsxFmt)
-	if err != nil {
-		return err
-	}
-	timeStyle, err := defineStyle(xlsxfile, c.TimeXlsxFmt)
-	if err != nil {
-		return err
-	}
-	datetimeStyle, err := defineStyle(xlsxfile, c.DatetimeXlsxFmt)
-	if err != nil {
-		return err
-	}
-	numberStyle, err := defineStyle(xlsxfile, c.NumberXlsxFmt)
-	if err != nil {
-		return err
-	}
-
+	var oc *outputContext
+	var err error
 	for _, csvfilename := range args {
-		ctx := outputContext{
-			xlsxfile:    xlsxfile,
-			csvfilename: csvfilename,
-
-			hints: columnHints,
-
-			dateStyle:     dateStyle,
-			timeStyle:     timeStyle,
-			datetimeStyle: datetimeStyle,
-			numberStyle:   numberStyle,
-
-			datePtns: datePtns,
-			timePtns: timePtns,
+		oc, err = c.makeOutputContext(oc, xlsxfile, csvfilename)
+		if err != nil {
+			return err
 		}
-		err = c.runOneCSV(ctx)
+
+		err = c.runOneCSV(*oc)
 		if err != nil {
 			return err
 		}
@@ -132,6 +89,63 @@ type outputContext struct {
 	dateStyle, timeStyle, datetimeStyle, numberStyle int
 
 	datePtns, timePtns []string
+}
+
+func (c globalCmd) makeOutputContext(orig *outputContext, xlsxfile *excelize.File, csvfilename string) (*outputContext, error) {
+	if orig == nil {
+		oc := &outputContext{
+			xlsxfile:    xlsxfile,
+			csvfilename: csvfilename,
+		}
+
+		hintRE := regexp.MustCompile(`(text|number|date|time|datetime)(:?\((.+)\))?`)
+		for k, v := range c.Columns {
+			subs := hintRE.FindStringSubmatch(v)
+			if subs == nil {
+				return nil, fmt.Errorf("a value of --columns is invalid: %q:%q", k, v)
+			}
+
+			col := newColumn(k, colType(subs[1]), strings.TrimSpace(subs[2]))
+			if col.Type == typeDate && col.InputFormat == "" {
+				col.InputFormat = c.DateFmt
+			} else if col.Type == typeTime && col.InputFormat == "" {
+				col.InputFormat = c.TimeFmt
+			} else if col.Type == typeDatetime && col.InputFormat == "" {
+				col.InputFormat = c.DatetimeFmt
+			}
+
+			oc.hints = append(oc.hints, col)
+		}
+
+		oc.datePtns = translateDatePatterns(c.DateFmt)
+		oc.timePtns = translateTimePatterns(c.TimeFmt)
+
+		var err error
+		oc.dateStyle, err = defineStyle(xlsxfile, c.DateXlsxFmt)
+		if err != nil {
+			return nil, err
+		}
+		oc.timeStyle, err = defineStyle(xlsxfile, c.TimeXlsxFmt)
+		if err != nil {
+			return nil, err
+		}
+		oc.datetimeStyle, err = defineStyle(xlsxfile, c.DatetimeXlsxFmt)
+		if err != nil {
+			return nil, err
+		}
+		oc.numberStyle, err = defineStyle(xlsxfile, c.NumberXlsxFmt)
+		if err != nil {
+			return nil, err
+		}
+
+		return oc, nil
+	}
+
+	oc := orig
+	oc.xlsxfile = xlsxfile
+	oc.csvfilename = csvfilename
+
+	return oc, nil
 }
 
 func (c globalCmd) runOneCSV(oc outputContext) error {
