@@ -38,7 +38,7 @@ type globalCmd struct {
 
 	NumberXlsxFmt string `cli:"number-xlsx,nxf" default:""`
 
-	Columns gli.Map `cli:"columns,cols" help:"[SHEET!]COLUMN_NAME:TYPE(INPUT_FORMAT),..."`
+	Columns gli.Map `cli:"columns,cols" help:"[SHEET!]COLUMN_NAME:TYPE[(INPUT_FORMAT)],..."`
 }
 
 func (c globalCmd) Before(args []string) error {
@@ -486,9 +486,9 @@ func main() {
 	app.Version = Version
 	app.Usage = `csv2xlsx [options] -o FILENAME CSV_FILENAME [CSV_FILENAME...]
 
---columns [SHEET!]COLUMN_NAME:TYPE(INPUT_FORMAT)
+--columns [SHEET!]COLUMN_NAME:TYPE[(INPUT_FORMAT)]
   SHEET = CSV_FILENAME
-  TYPE = [text|number|date|time|datetime]
+  TYPE = text|number|date|time|datetime
   INPUT_FORMAT
     date: yyyy, yy, y, 2006, 06, mm, m, 01, 1, dd, d, 02, 2
     time: hh, h, 15, 3, mm, m, 04, 4, ss, s, 05, 5
