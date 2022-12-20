@@ -98,7 +98,7 @@ func (c globalCmd) makeOutputContext(orig *outputContext, xlsxfile *excelize.Fil
 			csvfilename: csvfilename,
 		}
 
-		hintRE := regexp.MustCompile(`(text|number|date|time|datetime)(:?\((.+)\))?`)
+		hintRE := regexp.MustCompile(`(text|number|date|time|datetime|bool)(:?\((.+)\))?`)
 		for k, v := range c.Columns {
 			subs := hintRE.FindStringSubmatch(v)
 			if subs == nil {
@@ -316,6 +316,12 @@ func (c globalCmd) guess(value string, col column, dateLayouts, timeLayouts []st
 	if value[0] == '\'' || value[0] == '0' {
 		return typeText, value
 	}
+	if strings.ToLower(value) == "true" {
+		return typeBool, true
+	}
+	if strings.ToLower(value) == "false" {
+		return typeBool, false
+	}
 	if t, ok := parseTime(value, c.DatetimeFmt); ok {
 		return typeDatetime, t
 	}
@@ -357,6 +363,11 @@ func (c globalCmd) guessByColType(value string, col column) (colType, interface{
 	case typeDatetime:
 		if t, ok := parseTime(value, col.InputFormat); ok {
 			return typeDatetime, t
+		}
+
+	case typeBool:
+		if b, err := strconv.ParseBool(value); err == nil {
+			return typeBool, b
 		}
 
 	default: // nop
@@ -488,7 +499,7 @@ func main() {
 
 --columns [SHEET!]COLUMN_NAME:TYPE[(INPUT_FORMAT)]
   SHEET = CSV_FILENAME
-  TYPE = text|number|date|time|datetime
+  TYPE = text|number|date|time|datetime|bool
   INPUT_FORMAT
     date: yyyy, yy, y, 2006, 06, mm, m, 01, 1, dd, d, 02, 2
     time: hh, h, 15, 3, mm, m, 04, 4, ss, s, 05, 5

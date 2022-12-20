@@ -97,4 +97,5 @@ const (
 	typeDate     colType = "date"
 	typeTime     colType = "time"
 	typeDatetime colType = "datetime"
+	typeBool     colType = "bool"
 )
