@@ -13,6 +13,7 @@ import (
 
 	"encoding/csv"
 
+	"github.com/andrew-d/go-termutil"
 	"github.com/shu-go/gli"
 	"github.com/xuri/excelize/v2"
 )
@@ -39,6 +40,8 @@ type globalCmd struct {
 	NumberXlsxFmt string `cli:"number-xlsx,nxf" default:""`
 
 	Columns gli.Map `cli:"columns,cols" help:"[SHEET!]COLUMN_NAME:TYPE[(INPUT_FORMAT)],..."`
+
+	PipelinedName string `cli:"pipelined-name,name=SHEET_NAME" help:"the name of a pipelined CSV" default:"Sheet1"`
 }
 
 func (c globalCmd) Before(args []string) error {
@@ -46,7 +49,7 @@ func (c globalCmd) Before(args []string) error {
 		return errors.New("--output is required")
 	}
 
-	if len(args) == 0 {
+	if termutil.Isatty(os.Stdin.Fd()) && len(args) == 0 {
 		return errors.New("at least one csv file is required")
 	}
 
@@ -67,6 +70,22 @@ func (c globalCmd) Run(args []string) error {
 
 	var oc *outputContext
 	shouldDelSheet1 := true
+
+	if !termutil.Isatty(os.Stdin.Fd()) {
+		csvfilename := c.PipelinedName
+		oc, err = c.makeOutputContext(oc, xlsxfile, csvfilename)
+		oc.input = os.Stdin
+
+		err = c.runOneCSV(*oc)
+		if err != nil {
+			return err
+		}
+
+		oc.input = nil
+
+		shouldDelSheet1 = shouldDelSheet1 && csvfilename != "Sheet1"
+	}
+
 	for _, csvfilename := range args {
 		oc, err = c.makeOutputContext(oc, xlsxfile, csvfilename)
 		if err != nil {
@@ -96,6 +115,7 @@ func (c globalCmd) Run(args []string) error {
 type outputContext struct {
 	xlsxfile    *excelize.File
 	csvfilename string
+	input       io.Reader
 
 	hints columns
 
@@ -166,15 +186,20 @@ func (c globalCmd) runOneCSV(oc outputContext) error {
 
 	oc.xlsxfile.DeleteSheet(sheet)
 
-	csvfile, err := os.Open(oc.csvfilename)
-	if err != nil {
-		return err
+	var r *csv.Reader
+	if oc.input != nil {
+		r = csv.NewReader(oc.input)
+	} else {
+		csvfile, err := os.Open(oc.csvfilename)
+		if err != nil {
+			return err
+		}
+		defer csvfile.Close()
+		r = csv.NewReader(csvfile)
 	}
-	defer csvfile.Close()
 
 	oc.xlsxfile.NewSheet(sheet)
 
-	r := csv.NewReader(csvfile)
 	csvrindex := 0
 	xlsxrindex := 0
 	columns := columns{}

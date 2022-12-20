@@ -3,6 +3,7 @@ module github.com/shu-go/csv2xlsx
 go 1.19
 
 require (
+	github.com/andrew-d/go-termutil v0.0.0-20150726205930-009166a695a2
 	github.com/shu-go/gli v1.5.6
 	github.com/xuri/excelize/v2 v2.6.1
 )
