@@ -54,10 +54,19 @@ func (c globalCmd) Before(args []string) error {
 }
 
 func (c globalCmd) Run(args []string) error {
-	xlsxfile := excelize.NewFile()
+	var xlsxfile *excelize.File
+	var err error
+	if fileExists(c.Output) {
+		xlsxfile, err = excelize.OpenFile(filepath.Clean(c.Output))
+		if err != nil {
+			return err
+		}
+	} else {
+		xlsxfile = excelize.NewFile()
+	}
 
 	var oc *outputContext
-	var err error
+	shouldDelSheet1 := true
 	for _, csvfilename := range args {
 		oc, err = c.makeOutputContext(oc, xlsxfile, csvfilename)
 		if err != nil {
@@ -68,9 +77,13 @@ func (c globalCmd) Run(args []string) error {
 		if err != nil {
 			return err
 		}
+
+		shouldDelSheet1 = shouldDelSheet1 && csvfilename != "Sheet1"
 	}
 
-	xlsxfile.DeleteSheet("Sheet1")
+	if shouldDelSheet1 {
+		xlsxfile.DeleteSheet("Sheet1")
+	}
 	xlsxfile.SetActiveSheet(0)
 	err = xlsxfile.SaveAs(c.Output)
 	if err != nil {
@@ -150,6 +163,8 @@ func (c globalCmd) makeOutputContext(orig *outputContext, xlsxfile *excelize.Fil
 
 func (c globalCmd) runOneCSV(oc outputContext) error {
 	sheet := filepath.Base(oc.csvfilename)
+
+	oc.xlsxfile.DeleteSheet(sheet)
 
 	csvfile, err := os.Open(oc.csvfilename)
 	if err != nil {
@@ -488,6 +503,11 @@ func setCellValueAndStyle(f *excelize.File, sheet, axis string, value interface{
 	}
 
 	return nil
+}
+
+func fileExists(name string) bool {
+	info, err := os.Stat(filepath.Clean(name))
+	return err == nil && !info.IsDir()
 }
 
 func main() {
