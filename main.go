@@ -58,52 +58,47 @@ func (c globalCmd) Before(args []string) error {
 
 func (c globalCmd) Run(args []string) error {
 	var xlsxfile *excelize.File
-	var err error
+	exists := false
 	if fileExists(c.Output) {
-		xlsxfile, err = excelize.OpenFile(filepath.Clean(c.Output))
+		exists = true
+		f, err := excelize.OpenFile(filepath.Clean(c.Output))
 		if err != nil {
 			return err
 		}
+		xlsxfile = f
 	} else {
 		xlsxfile = excelize.NewFile()
 	}
 
-	var oc *outputContext
-	shouldDelSheet1 := true
+	oc, err := c.makeOutputContext(xlsxfile, exists)
 
 	if !termutil.Isatty(os.Stdin.Fd()) {
-		csvfilename := c.PipelinedName
-		oc, err = c.makeOutputContext(oc, xlsxfile, csvfilename)
-		oc.input = os.Stdin
-
-		err = c.runOneCSV(*oc)
-		if err != nil {
-			return err
-		}
-
-		oc.input = nil
-
-		shouldDelSheet1 = shouldDelSheet1 && csvfilename != "Sheet1"
+		oc.inputs = append(oc.inputs, input{
+			Name:   c.PipelinedName,
+			Reader: os.Stdin,
+		})
 	}
 
 	for _, csvfilename := range args {
-		oc, err = c.makeOutputContext(oc, xlsxfile, csvfilename)
+		csvfilename = filepath.Clean(csvfilename)
+
+		f, err := os.Open(csvfilename)
 		if err != nil {
 			return err
 		}
+		defer func(f *os.File) { f.Close() }(f)
 
-		err = c.runOneCSV(*oc)
-		if err != nil {
-			return err
-		}
-
-		shouldDelSheet1 = shouldDelSheet1 && csvfilename != "Sheet1"
+		oc.inputs = append(oc.inputs, input{
+			Name:   csvfilename,
+			Reader: f,
+		})
 	}
 
-	if shouldDelSheet1 {
-		xlsxfile.DeleteSheet("Sheet1")
+	err = c.convert(oc)
+	if err != nil {
+		return err
 	}
-	xlsxfile.SetActiveSheet(0)
+
 	err = xlsxfile.SaveAs(c.Output)
 	if err != nil {
 		return err
@@ -112,10 +107,16 @@ func (c globalCmd) Run(args []string) error {
 	return nil
 }
 
+type input struct {
+	Name   string
+	Reader io.Reader
+}
+
 type outputContext struct {
-	xlsxfile    *excelize.File
-	csvfilename string
-	input       io.Reader
+	output      *excelize.File
+	overwriting bool
+
+	inputs []input
 
 	hints columns
 
@@ -124,86 +125,88 @@ type outputContext struct {
 	datePtns, timePtns []string
 }
 
-func (c globalCmd) makeOutputContext(orig *outputContext, xlsxfile *excelize.File, csvfilename string) (*outputContext, error) {
-	if orig == nil {
-		oc := &outputContext{
-			xlsxfile:    xlsxfile,
-			csvfilename: csvfilename,
-		}
+func (c globalCmd) makeOutputContext(xlsxfile *excelize.File, overwriting bool) (outputContext, error) {
+	oc := outputContext{
+		output:      xlsxfile,
+		overwriting: overwriting,
 
-		hintRE := regexp.MustCompile(`(text|number|date|time|datetime|bool)(:?\((.+)\))?`)
-		for k, v := range c.Columns {
-			subs := hintRE.FindStringSubmatch(v)
-			if subs == nil {
-				return nil, fmt.Errorf("a value of --columns is invalid: %q:%q", k, v)
-			}
-
-			col := newColumn(k, colType(subs[1]), strings.TrimSpace(subs[2]))
-			if col.Type == typeDate && col.InputFormat == "" {
-				col.InputFormat = c.DateFmt
-			} else if col.Type == typeTime && col.InputFormat == "" {
-				col.InputFormat = c.TimeFmt
-			} else if col.Type == typeDatetime && col.InputFormat == "" {
-				col.InputFormat = c.DatetimeFmt
-			}
-
-			oc.hints = append(oc.hints, col)
-		}
-		/*
-			for _, h := range oc.hints {
-				log.Println(h)
-			}
-		*/
-
-		oc.datePtns = translateDatePatterns(c.DateFmt)
-		oc.timePtns = translateTimePatterns(c.TimeFmt)
-
-		var err error
-		oc.dateStyle, err = defineStyle(xlsxfile, c.DateXlsxFmt)
-		if err != nil {
-			return nil, err
-		}
-		oc.timeStyle, err = defineStyle(xlsxfile, c.TimeXlsxFmt)
-		if err != nil {
-			return nil, err
-		}
-		oc.datetimeStyle, err = defineStyle(xlsxfile, c.DatetimeXlsxFmt)
-		if err != nil {
-			return nil, err
-		}
-		oc.numberStyle, err = defineStyle(xlsxfile, c.NumberXlsxFmt)
-		if err != nil {
-			return nil, err
-		}
-
-		return oc, nil
+		datePtns: translateDatePatterns(c.DateFmt),
+		timePtns: translateTimePatterns(c.TimeFmt),
 	}
 
-	oc := orig
-	oc.xlsxfile = xlsxfile
-	oc.csvfilename = csvfilename
+	hintRE := regexp.MustCompile(`(text|number|date|time|datetime|bool)(:?\((.+)\))?`)
+	for k, v := range c.Columns {
+		subs := hintRE.FindStringSubmatch(v)
+		if subs == nil {
+			return outputContext{}, fmt.Errorf("a value of --columns is invalid: %q:%q", k, v)
+		}
+
+		col := newColumn(k, colType(subs[1]), strings.TrimSpace(subs[2]))
+		if col.Type == typeDate && col.InputFormat == "" {
+			col.InputFormat = c.DateFmt
+		} else if col.Type == typeTime && col.InputFormat == "" {
+			col.InputFormat = c.TimeFmt
+		} else if col.Type == typeDatetime && col.InputFormat == "" {
+			col.InputFormat = c.DatetimeFmt
+		}
+
+		oc.hints = append(oc.hints, col)
+	}
+	/*
+		for _, h := range oc.hints {
+			log.Println(h)
+		}
+	*/
+
+	var err error
+	oc.dateStyle, err = defineStyle(xlsxfile, c.DateXlsxFmt)
+	if err != nil {
+		return outputContext{}, err
+	}
+	oc.timeStyle, err = defineStyle(xlsxfile, c.TimeXlsxFmt)
+	if err != nil {
+		return outputContext{}, err
+	}
+	oc.datetimeStyle, err = defineStyle(xlsxfile, c.DatetimeXlsxFmt)
+	if err != nil {
+		return outputContext{}, err
+	}
+	oc.numberStyle, err = defineStyle(xlsxfile, c.NumberXlsxFmt)
+	if err != nil {
+		return outputContext{}, err
+	}
 
 	return oc, nil
 }
 
-func (c globalCmd) runOneCSV(oc outputContext) error {
-	sheet := filepath.Base(oc.csvfilename)
-
-	oc.xlsxfile.DeleteSheet(sheet)
-
-	var r *csv.Reader
-	if oc.input != nil {
-		r = csv.NewReader(oc.input)
-	} else {
-		csvfile, err := os.Open(oc.csvfilename)
+func (c globalCmd) convert(oc outputContext) error {
+	for _, in := range oc.inputs {
+		err := c.convertOne(oc, in.Name, in.Reader)
 		if err != nil {
 			return err
 		}
-		defer csvfile.Close()
-		r = csv.NewReader(csvfile)
 	}
 
-	oc.xlsxfile.NewSheet(sheet)
+	sheet1 := false
+	for _, in := range oc.inputs {
+		sheet1 = sheet1 || strings.EqualFold(in.Name, "Sheet1")
+	}
+
+	if !sheet1 && !oc.overwriting {
+		oc.output.DeleteSheet("Sheet1")
+	}
+
+	oc.output.SetActiveSheet(0)
+
+	return nil
+}
+
+func (c globalCmd) convertOne(oc outputContext, sheet string, input io.Reader) error {
+	oc.output.DeleteSheet(sheet)
+	oc.output.NewSheet(sheet)
+
+	var r *csv.Reader
+	r = csv.NewReader(input)
 
 	csvrindex := 0
 	xlsxrindex := 0
@@ -222,7 +225,7 @@ func (c globalCmd) runOneCSV(oc outputContext) error {
 				columns = append(columns, strings.TrimSpace(fields[cindex]))
 			}
 
-			err := writeXlsxHeader(oc.xlsxfile, sheet, xlsxrindex, fields)
+			err := writeXlsxHeader(oc.output, sheet, xlsxrindex, fields)
 			if err != nil {
 				return err
 			}
@@ -256,7 +259,7 @@ func (c globalCmd) runOneCSV(oc outputContext) error {
 			}
 
 			if !c.GuessType {
-				err = oc.xlsxfile.SetCellValue(sheet, addr, value)
+				err = oc.output.SetCellValue(sheet, addr, value)
 				if err != nil {
 					return err
 				}
@@ -272,7 +275,7 @@ func (c globalCmd) runOneCSV(oc outputContext) error {
 
 			typ, ival := c.guess(value, col, oc.datePtns, oc.timePtns)
 
-			err = writeXlsx(oc.xlsxfile, sheet, addr, typ, ival, oc.numberStyle, oc.dateStyle, oc.timeStyle, oc.datetimeStyle)
+			err = writeXlsx(oc.output, sheet, addr, typ, ival, oc.numberStyle, oc.dateStyle, oc.timeStyle, oc.datetimeStyle)
 			if err != nil {
 				return err
 			}
