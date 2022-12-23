@@ -2,7 +2,10 @@ package main
 
 import (
 	"path/filepath"
+	"strconv"
 	"strings"
+
+	"github.com/xuri/excelize/v2"
 )
 
 type columns []column
@@ -25,9 +28,23 @@ func newColumn(s string, typ colType, format string) column {
 	return c
 }
 
-func (cc columns) findByName(sheet, name string) int {
+func (cc columns) findByName(sheet, name string, optColNum ...int) int {
 	if cc == nil {
 		return -1
+	}
+
+	colNameAlpha := ""
+	colNameNum := ""
+	if len(optColNum) > 0 {
+		colNameNum = "#" + strconv.Itoa(optColNum[0])
+
+		var err error
+		colNameAlpha, err = excelize.ColumnNumberToName(optColNum[0])
+		if err == nil {
+			colNameAlpha = "$" + colNameAlpha
+		} else {
+			colNameAlpha = ""
+		}
 	}
 
 	sheet = strings.ToLower(sheet)
@@ -39,6 +56,16 @@ func (cc columns) findByName(sheet, name string) int {
 			return i
 		}
 	}
+	for i, c := range cc {
+		if strings.EqualFold(c.Name, colNameAlpha) && strings.EqualFold(c.Sheet, sheet) {
+			return i
+		}
+	}
+	for i, c := range cc {
+		if strings.EqualFold(c.Name, colNameNum) && strings.EqualFold(c.Sheet, sheet) {
+			return i
+		}
+	}
 
 	// name:exact, sheet:wildcard
 	for i, c := range cc {
@@ -46,10 +73,30 @@ func (cc columns) findByName(sheet, name string) int {
 			return i
 		}
 	}
+	for i, c := range cc {
+		if strings.EqualFold(c.Name, colNameAlpha) && wildcardMatch(c.Sheet, sheet) {
+			return i
+		}
+	}
+	for i, c := range cc {
+		if strings.EqualFold(c.Name, colNameNum) && wildcardMatch(c.Sheet, sheet) {
+			return i
+		}
+	}
 
 	// name:exact, sheet:empty
 	for i, c := range cc {
 		if strings.EqualFold(c.Name, name) && strings.EqualFold(c.Sheet, "") {
+			return i
+		}
+	}
+	for i, c := range cc {
+		if strings.EqualFold(c.Name, colNameAlpha) && strings.EqualFold(c.Sheet, "") {
+			return i
+		}
+	}
+	for i, c := range cc {
+		if strings.EqualFold(c.Name, colNameNum) && strings.EqualFold(c.Sheet, "") {
 			return i
 		}
 	}

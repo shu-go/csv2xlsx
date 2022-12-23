@@ -149,6 +149,11 @@ func (c globalCmd) makeOutputContext(orig *outputContext, xlsxfile *excelize.Fil
 
 			oc.hints = append(oc.hints, col)
 		}
+		/*
+			for _, h := range oc.hints {
+				log.Println(h)
+			}
+		*/
 
 		oc.datePtns = translateDatePatterns(c.DateFmt)
 		oc.timePtns = translateTimePatterns(c.TimeFmt)
@@ -202,7 +207,7 @@ func (c globalCmd) runOneCSV(oc outputContext) error {
 
 	csvrindex := 0
 	xlsxrindex := 0
-	columns := columns{}
+	columns := []string{}
 
 	for {
 		fields, err := r.Read()
@@ -214,14 +219,7 @@ func (c globalCmd) runOneCSV(oc outputContext) error {
 
 		if csvrindex == c.Header-1 {
 			for cindex := range fields {
-				colname := strings.TrimSpace(fields[cindex])
-				var col column
-				if i := oc.hints.findByName(sheet, colname); i != -1 {
-					col = oc.hints[i]
-				} else {
-					col = newColumn(sheet+"!"+colname, typeUnknown, "")
-				}
-				columns = append(columns, col)
+				columns = append(columns, strings.TrimSpace(fields[cindex]))
 			}
 
 			err := writeXlsxHeader(oc.xlsxfile, sheet, xlsxrindex, fields)
@@ -242,21 +240,15 @@ func (c globalCmd) runOneCSV(oc outputContext) error {
 				return err
 			}
 
-			var col column
-			if i := oc.hints.findByName(sheet, colName); i != -1 {
-				col = oc.hints[i]
-			} else {
-				col = newColumn(sheet+"!"+colName, typeUnknown, "")
-			}
-			columns = append(columns, col)
+			columns = append(columns, "$"+colName)
 		}
 
 		for cindex, value := range fields {
-			g := columns[cindex]
+			colName := columns[cindex]
 
 			addr, err := excelize.CoordinatesToCellName(cindex+1, xlsxrindex+1)
 			if err != nil {
-				return fmt.Errorf("%v: %v\n", g.Name, err)
+				return fmt.Errorf("%v: %v\n", colName, err)
 			}
 
 			if len(value) == 0 {
@@ -272,7 +264,13 @@ func (c globalCmd) runOneCSV(oc outputContext) error {
 				continue
 			}
 
-			typ, ival := c.guess(value, g, oc.datePtns, oc.timePtns)
+			hindex := oc.hints.findByName(sheet, colName, cindex+1)
+			col := column{}
+			if hindex != -1 {
+				col = oc.hints[hindex]
+			}
+
+			typ, ival := c.guess(value, col, oc.datePtns, oc.timePtns)
 
 			err = writeXlsx(oc.xlsxfile, sheet, addr, typ, ival, oc.numberStyle, oc.dateStyle, oc.timeStyle, oc.datetimeStyle)
 			if err != nil {
