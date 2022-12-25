@@ -207,6 +207,9 @@ func (c globalCmd) convertOne(oc outputContext, sheet string, input io.Reader) e
 
 	var r *csv.Reader
 	r = csv.NewReader(input)
+	if len(c.Delimiter) > 0 {
+		r.Comma = []rune(c.Delimiter)[0]
+	}
 
 	csvrindex := 0
 	xlsxrindex := 0
