@@ -205,8 +205,7 @@ func (c globalCmd) convertOne(oc outputContext, sheet string, input io.Reader) e
 	oc.output.DeleteSheet(sheet)
 	oc.output.NewSheet(sheet)
 
-	var r *csv.Reader
-	r = csv.NewReader(input)
+	r := csv.NewReader(input)
 	if len(c.Delimiter) > 0 {
 		r.Comma = []rune(c.Delimiter)[0]
 	}
@@ -393,13 +392,13 @@ func (c globalCmd) guessByColType(value string, col column) (colType, interface{
 		}
 
 	case typeDate:
-		var ptns []string = translateDatePatterns(col.InputFormat)
+		ptns := translateDatePatterns(col.InputFormat)
 		if t, ok := parseTime(value, ptns...); ok {
 			return typeDate, t
 		}
 
 	case typeTime:
-		var ptns []string = translateTimePatterns(col.InputFormat)
+		ptns := translateTimePatterns(col.InputFormat)
 		if t, ok := parseTime(value, ptns...); ok {
 			return typeTime, t
 		}
