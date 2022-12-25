@@ -134,7 +134,7 @@ func (c globalCmd) makeOutputContext(xlsxfile *excelize.File, overwriting bool) 
 		timePtns: translateTimePatterns(c.TimeFmt),
 	}
 
-	hintRE := regexp.MustCompile(`(text|number|date|time|datetime|bool)(?:\((.+)\))?`)
+	hintRE := regexp.MustCompile(`(text|number|datetime|date|time|bool)(?:\((.+)\))?`)
 	for k, v := range c.Columns {
 		subs := hintRE.FindStringSubmatch(v)
 		if subs == nil {
