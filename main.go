@@ -71,6 +71,9 @@ func (c globalCmd) Run(args []string) error {
 	}
 
 	oc, err := c.makeOutputContext(xlsxfile, exists)
+	if err != nil {
+		return err
+	}
 
 	if !termutil.Isatty(os.Stdin.Fd()) {
 		oc.inputs = append(oc.inputs, input{
