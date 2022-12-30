@@ -112,9 +112,10 @@ func TestGuess(t *testing.T) {
 	})
 
 	t.Run("GuessDatetime", func(t *testing.T) {
-		tst("20220304", "2022/03/04", "--columns", "#1:datetime")
+		tst("20220304", "20220304", "--columns", "#1:datetime")
 		tst("20220304 123456", "2022/03/04 12:34:56", "--columns", "#1:datetime")
 		tst("Feb 4, 2008 4:45pm", "2008/02/04 16:45:00", "--columns", `#1:datetime(Jan 2\, 2006 3:04pm)`, "-d", ";")
+		tst("true", "true", "--columns", "#1:datetime")
 	})
 }
 

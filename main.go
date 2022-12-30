@@ -354,7 +354,7 @@ func writeXlsx(f *excelize.File, sheet string, axis string, typ colType, value i
 }
 
 func (c globalCmd) guess(value string, col column, dateLayouts, timeLayouts []string) (colType, interface{}) {
-	typ, ival := c.guessByColType(value, col)
+	typ, ival := c.guessByColType(value, col, dateLayouts, timeLayouts)
 	if typ != typeUnknown {
 		return typ, ival
 	}
@@ -384,7 +384,7 @@ func (c globalCmd) guess(value string, col column, dateLayouts, timeLayouts []st
 	return typeUnknown, value
 }
 
-func (c globalCmd) guessByColType(value string, col column) (colType, interface{}) {
+func (c globalCmd) guessByColType(value string, col column, dateLayouts, timeLayouts []string) (colType, interface{}) {
 	switch col.Type {
 	case typeText:
 		return typeText, value
@@ -396,18 +396,22 @@ func (c globalCmd) guessByColType(value string, col column) (colType, interface{
 
 	case typeDate:
 		ptns := translateDatePatterns(col.InputFormat)
+		ptns = append(ptns, dateLayouts...)
 		if t, ok := parseTime(value, ptns...); ok {
 			return typeDate, t
 		}
 
 	case typeTime:
 		ptns := translateTimePatterns(col.InputFormat)
+		ptns = append(ptns, timeLayouts...)
 		if t, ok := parseTime(value, ptns...); ok {
 			return typeTime, t
 		}
 
 	case typeDatetime:
-		if t, ok := parseTime(value, col.InputFormat); ok {
+		ptns := append([]string{}, col.InputFormat)
+		ptns = append(ptns, c.DatetimeFmt)
+		if t, ok := parseTime(value, ptns...); ok {
 			return typeDatetime, t
 		}
 
@@ -417,6 +421,10 @@ func (c globalCmd) guessByColType(value string, col column) (colType, interface{
 		}
 
 	default: // nop
+	}
+
+	if col.Type != typeUnknown {
+		return typeText, value
 	}
 
 	return typeUnknown, value
