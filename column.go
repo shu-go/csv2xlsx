@@ -14,13 +14,12 @@ type column struct {
 	Sheet string
 	Name  string
 
-	Type        colType
-	InputFormat string
+	Type derivedType
 }
 
-func newColumn(s string, typ colType, format string) column {
+func newColumn(s string, typ derivedType) column {
 	s = strings.ToLower(s)
-	c := column{Sheet: "", Name: s, Type: typ, InputFormat: format}
+	c := column{Sheet: "", Name: s, Type: typ}
 	if pos := strings.Index(s, "!"); pos != -1 {
 		c.Sheet = s[:pos]
 		c.Name = s[pos+1:]
@@ -134,15 +133,3 @@ func wildcardMatch(pattern, name string) bool {
 	}
 	return false
 }
-
-type colType string
-
-const (
-	typeUnknown  colType = ""
-	typeText     colType = "text"
-	typeNumber   colType = "number"
-	typeDate     colType = "date"
-	typeTime     colType = "time"
-	typeDatetime colType = "datetime"
-	typeBool     colType = "bool"
-)
