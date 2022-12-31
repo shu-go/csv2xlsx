@@ -93,7 +93,7 @@ func parseType(s string) (derivedType, error) {
 	return derived, nil
 }
 
-func initImplicitDecls(dil, dol, til, tol, dtil, dtol string) {
+func initImplicitDecls(dil, dol, til, tol, dtil, dtol, nol string) {
 	implicitInputFormats = make(map[baseType]string)
 	implicitInputFormats[typeDate] = dil
 	implicitInputFormats[typeTime] = til
@@ -103,4 +103,5 @@ func initImplicitDecls(dil, dol, til, tol, dtil, dtol string) {
 	implicitOutputFormats[typeDate] = dol
 	implicitOutputFormats[typeTime] = tol
 	implicitOutputFormats[typeDatetime] = dtol
+	implicitOutputFormats[typeNumber] = nol
 }

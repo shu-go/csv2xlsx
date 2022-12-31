@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -174,7 +175,7 @@ func (c globalCmd) makeOutputContext(xlsxfile *excelize.File, overwriting bool) 
 }
 
 func (c globalCmd) convert(oc outputContext) error {
-	initImplicitDecls(c.DateFmt, c.DateXlsxFmt, c.TimeFmt, c.TimeXlsxFmt, c.DatetimeFmt, c.DatetimeXlsxFmt)
+	initImplicitDecls(c.DateFmt, c.DateXlsxFmt, c.TimeFmt, c.TimeXlsxFmt, c.DatetimeFmt, c.DatetimeXlsxFmt, c.NumberXlsxFmt)
 
 	for _, in := range oc.inputs {
 		err := c.convertOne(oc, in.Name, in.Reader)
@@ -270,6 +271,7 @@ func (c globalCmd) convertOne(oc outputContext, sheet string, input io.Reader) e
 			if hindex != -1 {
 				col = oc.hints[hindex]
 			}
+			log.Println("  ", hindex, col.Type)
 
 			typ, ival := c.guess(value, col)
 
