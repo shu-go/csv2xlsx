@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"log"
+	"math/rand"
+	"strings"
 	"testing"
 
 	"github.com/shu-go/gli"
@@ -156,4 +158,73 @@ func TestMultiple(t *testing.T) {
 	testValue(t, oc, "test2.csv", "A1", "ni")
 	testValue(t, oc, "test3.csv", "A1", "san")
 	testValue(t, oc, "test3.csv", "A2", "")
+}
+
+func BenchmarkGuess(b *testing.B) {
+	tst := func(content, value string, args ...string) {
+		b.Helper()
+
+		cmd := dummyCmd(append([]string{"--header=0"}, args...)...)
+		oc, _ := cmd.makeOutputContext(excelize.NewFile(), false)
+		oc.inputs = []input{
+			newInput("test.csv", content),
+		}
+
+		_ = cmd.convert(oc)
+	}
+
+	gen := func(n int) []string {
+		templ := []string{
+			"abcdefgh",
+			"01234567",
+			"12345678",
+			"20221231",
+			"012345",
+			"123456",
+			"20221231 012345",
+			"20221231 123456",
+			"true",
+			"false",
+		}
+		l := len(templ)
+
+		s := make([]string, n)
+		for i := range s {
+			s[i] = templ[rand.Intn(l)]
+		}
+
+		return s
+	}
+
+	b.Run("10", func(b *testing.B) {
+		s := strings.Join(gen(00), "\n")
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			tst(s, "")
+		}
+	})
+
+	b.Run("100", func(b *testing.B) {
+		s := strings.Join(gen(100), "\n")
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			tst(s, "")
+		}
+	})
+
+	b.Run("1000", func(b *testing.B) {
+		s := strings.Join(gen(1000), "\n")
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			tst(s, "")
+		}
+	})
+
+	b.Run("10000", func(b *testing.B) {
+		s := strings.Join(gen(10000), "\n")
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			tst(s, "")
+		}
+	})
 }
