@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -39,7 +38,7 @@ type globalCmd struct {
 
 	NumberXlsxFmt string `cli:"number-xlsx,nxf" default:""`
 
-	Columns gli.Map `cli:"columns,cols" help:"[SHEET!]COLUMN_NAME:TYPE[(INPUT_FORMAT)],..."`
+	Columns gli.Map `cli:"columns,cols" help:"[SHEET!]COLUMN_NAME:TYPE[(INPUT_FORMAT[->OUTPUT_FORMAT])],..."`
 
 	PipelinedName string `cli:"pipelined-name,name=SHEET_NAME" help:"the name of a pipelined CSV" default:"Sheet1"`
 }
@@ -271,7 +270,6 @@ func (c globalCmd) convertOne(oc outputContext, sheet string, input io.Reader) e
 			if hindex != -1 {
 				col = oc.hints[hindex]
 			}
-			log.Println("  ", hindex, col.Type)
 
 			typ, ival := c.guess(value, col)
 
@@ -577,13 +575,17 @@ func main() {
 	app.Version = Version
 	app.Usage = `csv2xlsx [options] -o FILENAME CSV_FILENAME [CSV_FILENAME...]
 
---columns [SHEET!]COLUMN_NAME:TYPE[(INPUT_FORMAT)]
+--columns [SHEET!]COLUMN_NAME:TYPE[(INPUT_FORMAT[->OUTPUT_FORMAT])]
   SHEET = CSV_FILENAME
   TYPE = text|number|date|time|datetime|bool
   INPUT_FORMAT
     date: yyyy, yy, y, 2006, 06, mm, m, 01, 1, dd, d, 02, 2
     time: hh, h, 15, 3, mm, m, 04, 4, ss, s, 05, 5
     datetime: 2006, 06, 01, 1, 02, 2, 15, 3, 04, 4, 05, 5
+  Examples:
+    csv2xlsx -o dest.xlsx src.csv
+    csv2xlsx -o dest.xlsx --columns num_*:number src.csv
+    csv2xlsx -o dest.xlsx --columns num_*:"number(->#\,##0.00)" src.csv
 `
 	app.Copyright = "(C) 2022 Shuhei Kubota"
 	err := app.Run(os.Args)
