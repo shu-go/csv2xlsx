@@ -18,17 +18,17 @@ const (
 	typeBool     baseType = "bool"
 )
 
-func (t baseType) derive(explicitInputLayout string) derivedType {
+func (t baseType) derive(explicitInputFormat string) derivedType {
 	derived := derivedType{
 		baseType: t,
 	}
 
-	implicit, found := implicitInputLayouts[t]
+	implicit, found := implicitInputFormats[t]
 	if found {
-		derived.implicitInputLayout = implicit
+		derived.implicitInputFormat = implicit
 	}
 
-	derived.explicitInputLayout = explicitInputLayout
+	derived.explicitInputFormat = explicitInputFormat
 
 	return derived
 }
@@ -36,11 +36,11 @@ func (t baseType) derive(explicitInputLayout string) derivedType {
 type derivedType struct {
 	baseType baseType
 
-	explicitInputLayout string
-	implicitInputLayout string
+	explicitInputFormat string
+	implicitInputFormat string
 }
 
-var implicitInputLayouts map[baseType]string
+var implicitInputFormats map[baseType]string
 
 func parseType(s string) (derivedType, error) {
 	declRE := regexp.MustCompile(`(text|number|datetime|date|time|bool)(?:\((.+)\))?`)
@@ -56,9 +56,9 @@ func parseType(s string) (derivedType, error) {
 }
 
 func initImplicitDecls(dil, til, dtil string) {
-	implicitInputLayouts = make(map[baseType]string)
+	implicitInputFormats = make(map[baseType]string)
 
-	implicitInputLayouts[typeDate] = dil
-	implicitInputLayouts[typeTime] = til
-	implicitInputLayouts[typeDatetime] = dtil
+	implicitInputFormats[typeDate] = dil
+	implicitInputFormats[typeTime] = til
+	implicitInputFormats[typeDatetime] = dtil
 }

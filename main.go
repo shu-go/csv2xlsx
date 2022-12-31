@@ -359,18 +359,18 @@ func (c globalCmd) guess(value string, col column) (derivedType, interface{}) {
 	}
 
 	typetest := typeDatetime.derive("")
-	if t, ok := parseTime(value, typetest.implicitInputLayout); ok {
+	if t, ok := parseTime(value, typetest.implicitInputFormat); ok {
 		return typetest, t
 	}
 
 	typetest = typeDate.derive("")
-	ptns := translateDatePatterns(typetest.implicitInputLayout)
+	ptns := translateDatePatterns(typetest.implicitInputFormat)
 	if t, ok := parseTime(value, ptns...); ok {
 		return typetest, t
 	}
 
 	typetest = typeTime.derive("")
-	ptns = translateTimePatterns(typetest.implicitInputLayout)
+	ptns = translateTimePatterns(typetest.implicitInputFormat)
 	if t, ok := parseTime(value, ptns...); ok {
 		return typetest, t
 	}
@@ -393,22 +393,22 @@ func (c globalCmd) guessByColType(value string, col column) (derivedType, interf
 		}
 
 	case typeDate:
-		ptns := translateDatePatterns(col.Type.explicitInputLayout)
-		ptns = append(ptns, translateDatePatterns(col.Type.implicitInputLayout)...)
+		ptns := translateDatePatterns(col.Type.explicitInputFormat)
+		ptns = append(ptns, translateDatePatterns(col.Type.implicitInputFormat)...)
 		if t, ok := parseTime(value, ptns...); ok {
 			return col.Type, t
 		}
 
 	case typeTime:
-		ptns := translateTimePatterns(col.Type.explicitInputLayout)
-		ptns = append(ptns, translateTimePatterns(col.Type.implicitInputLayout)...)
+		ptns := translateTimePatterns(col.Type.explicitInputFormat)
+		ptns = append(ptns, translateTimePatterns(col.Type.implicitInputFormat)...)
 		if t, ok := parseTime(value, ptns...); ok {
 			return col.Type, t
 		}
 
 	case typeDatetime:
-		ptns := append([]string{}, col.Type.explicitInputLayout)
-		ptns = append(ptns, col.Type.implicitInputLayout)
+		ptns := append([]string{}, col.Type.explicitInputFormat)
+		ptns = append(ptns, col.Type.implicitInputFormat)
 		if t, ok := parseTime(value, ptns...); ok {
 			return col.Type, t
 		}
