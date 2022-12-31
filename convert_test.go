@@ -100,6 +100,7 @@ func TestGuess(t *testing.T) {
 	t.Run("GuessDate", func(t *testing.T) {
 		tst("20220304", "2022/03/04")
 		tst("4-3-22", "2022/03/04", "--columns", "#1:date(d-m-y)")
+		tst("4-3-22", "2022-03-04", "--columns", "#1:date(d-m-y -> yyyy-mm-dd)")
 		tst("4-3-22", "2022/03/04", "--columns", "#1:date(2-1-06)")
 		tst("4-3-22", "4-3-22", "--columns", "#1:date(dd-mm-yyyy)") // failure
 		tst("Feb 4 2008", "2008/02/04", "--columns", "#1:date(Jan 2 2006)")
@@ -117,6 +118,7 @@ func TestGuess(t *testing.T) {
 		tst("20220304", "20220304", "--columns", "#1:datetime")
 		tst("20220304 123456", "2022/03/04 12:34:56", "--columns", "#1:datetime")
 		tst("Feb 4, 2008 4:45pm", "2008/02/04 16:45:00", "--columns", `#1:datetime(Jan 2\, 2006 3:04pm)`, "-d", ";")
+		tst("Feb 4, 2008 4:45pm", "2008 02 04 16 45 00", "--columns", `#1:datetime(Jan 2\, 2006 3:04pm -> yyyy mm dd hh mm ss)`, "-d", ";")
 		tst("true", "true", "--columns", "#1:datetime")
 	})
 }

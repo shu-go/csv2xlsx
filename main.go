@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -123,25 +122,23 @@ type outputContext struct {
 
 	hints columns
 
-	dateStyle, timeStyle, datetimeStyle, numberStyle int
+	styles map[string]int
 }
 
 func (c globalCmd) makeOutputContext(xlsxfile *excelize.File, overwriting bool) (outputContext, error) {
 	oc := outputContext{
 		output:      xlsxfile,
 		overwriting: overwriting,
+		styles:      make(map[string]int),
 	}
 
-	hintRE := regexp.MustCompile(`(text|number|datetime|date|time|bool)(?:\((.+)\))?`)
 	for k, v := range c.Columns {
-		subs := hintRE.FindStringSubmatch(v)
-		if subs == nil {
-			return outputContext{}, fmt.Errorf("a value of --columns is invalid: %q:%q", k, v)
+		typ, err := parseType(v)
+		if err != nil {
+			return outputContext{}, err
 		}
 
-		col := newColumn(k, baseType(subs[1]).derive(strings.TrimSpace(subs[2])))
-
-		oc.hints = append(oc.hints, col)
+		oc.hints = append(oc.hints, newColumn(k, typ))
 	}
 	/*
 		for _, h := range oc.hints {
@@ -149,29 +146,35 @@ func (c globalCmd) makeOutputContext(xlsxfile *excelize.File, overwriting bool) 
 		}
 	*/
 
-	var err error
-	oc.dateStyle, err = defineStyle(xlsxfile, c.DateXlsxFmt)
+	style, err := defineStyle(xlsxfile, c.DateXlsxFmt)
 	if err != nil {
 		return outputContext{}, err
 	}
-	oc.timeStyle, err = defineStyle(xlsxfile, c.TimeXlsxFmt)
+	oc.styles[c.DateXlsxFmt] = style
+
+	style, err = defineStyle(xlsxfile, c.TimeXlsxFmt)
 	if err != nil {
 		return outputContext{}, err
 	}
-	oc.datetimeStyle, err = defineStyle(xlsxfile, c.DatetimeXlsxFmt)
+	oc.styles[c.TimeXlsxFmt] = style
+
+	style, err = defineStyle(xlsxfile, c.DatetimeXlsxFmt)
 	if err != nil {
 		return outputContext{}, err
 	}
-	oc.numberStyle, err = defineStyle(xlsxfile, c.NumberXlsxFmt)
+	oc.styles[c.DatetimeXlsxFmt] = style
+
+	style, err = defineStyle(xlsxfile, c.NumberXlsxFmt)
 	if err != nil {
 		return outputContext{}, err
 	}
+	oc.styles[c.NumberXlsxFmt] = style
 
 	return oc, nil
 }
 
 func (c globalCmd) convert(oc outputContext) error {
-	initImplicitDecls(c.DateFmt, c.TimeFmt, c.DatetimeFmt)
+	initImplicitDecls(c.DateFmt, c.DateXlsxFmt, c.TimeFmt, c.TimeXlsxFmt, c.DatetimeFmt, c.DatetimeXlsxFmt)
 
 	for _, in := range oc.inputs {
 		err := c.convertOne(oc, in.Name, in.Reader)
@@ -270,7 +273,7 @@ func (c globalCmd) convertOne(oc outputContext, sheet string, input io.Reader) e
 
 			typ, ival := c.guess(value, col)
 
-			err = writeXlsx(oc.output, sheet, addr, typ, ival, oc.numberStyle, oc.dateStyle, oc.timeStyle, oc.datetimeStyle)
+			err = writeXlsx(oc.output, sheet, addr, typ, ival, oc.styles)
 			if err != nil {
 				return err
 			}
@@ -297,7 +300,21 @@ func writeXlsxHeader(f *excelize.File, sheet string, rindex int, fields []string
 	return nil
 }
 
-func writeXlsx(f *excelize.File, sheet string, axis string, typ derivedType, value interface{}, numberStyle, dateStyle, timeStyle, datetimeStyle int) error {
+func writeXlsx(f *excelize.File, sheet string, axis string, typ derivedType, value interface{}, styles map[string]int) error {
+	outputfmt := typ.explicitOutputFormat
+	if outputfmt == "" {
+		outputfmt = typ.implicitOutputFormat
+	}
+	style, found := styles[outputfmt]
+	if !found {
+		var err error
+		style, err = defineStyle(f, outputfmt)
+		if err != nil {
+			return err
+		}
+
+	}
+
 	switch typ.baseType {
 	case typeText:
 		err := f.SetCellValue(sheet, axis, value)
@@ -306,13 +323,13 @@ func writeXlsx(f *excelize.File, sheet string, axis string, typ derivedType, val
 		}
 
 	case typeDatetime:
-		err := setCellValueAndStyle(f, sheet, axis, value, datetimeStyle)
+		err := setCellValueAndStyle(f, sheet, axis, value, style)
 		if err != nil {
 			return err
 		}
 
 	case typeDate:
-		err := setCellValueAndStyle(f, sheet, axis, value, dateStyle)
+		err := setCellValueAndStyle(f, sheet, axis, value, style)
 		if err != nil {
 			return err
 		}
@@ -322,13 +339,13 @@ func writeXlsx(f *excelize.File, sheet string, axis string, typ derivedType, val
 		if y, m, d := tval.Date(); y == 0 && m == 1 && d == 1 {
 			tval = time.Date(1900, 1, 1, tval.Hour(), tval.Minute(), tval.Second(), tval.Nanosecond(), tval.Location())
 		}
-		err := setCellValueAndStyle(f, sheet, axis, tval, timeStyle)
+		err := setCellValueAndStyle(f, sheet, axis, tval, style)
 		if err != nil {
 			return err
 		}
 
 	case typeNumber:
-		err := setCellValueAndStyle(f, sheet, axis, value, numberStyle)
+		err := setCellValueAndStyle(f, sheet, axis, value, style)
 		if err != nil {
 			return err
 		}
@@ -349,37 +366,37 @@ func (c globalCmd) guess(value string, col column) (derivedType, interface{}) {
 	}
 
 	if value[0] == '\'' || value[0] == '0' {
-		return typeText.derive(""), value
+		return typeText.derive("", ""), value
 	}
 	if strings.ToLower(value) == "true" {
-		return typeBool.derive(""), true
+		return typeBool.derive("", ""), true
 	}
 	if strings.ToLower(value) == "false" {
-		return typeBool.derive(""), false
+		return typeBool.derive("", ""), false
 	}
 
-	typetest := typeDatetime.derive("")
+	typetest := typeDatetime.derive("", "")
 	if t, ok := parseTime(value, typetest.implicitInputFormat); ok {
 		return typetest, t
 	}
 
-	typetest = typeDate.derive("")
+	typetest = typeDate.derive("", "")
 	ptns := translateDatePatterns(typetest.implicitInputFormat)
 	if t, ok := parseTime(value, ptns...); ok {
 		return typetest, t
 	}
 
-	typetest = typeTime.derive("")
+	typetest = typeTime.derive("", "")
 	ptns = translateTimePatterns(typetest.implicitInputFormat)
 	if t, ok := parseTime(value, ptns...); ok {
 		return typetest, t
 	}
 
 	if f, err := strconv.ParseFloat(value, 64); err == nil {
-		return typeNumber.derive(""), f
+		return typeNumber.derive("", ""), f
 	}
 
-	return typeUnknown.derive(""), value
+	return typeUnknown.derive("", ""), value
 }
 
 func (c globalCmd) guessByColType(value string, col column) (derivedType, interface{}) {
@@ -422,10 +439,10 @@ func (c globalCmd) guessByColType(value string, col column) (derivedType, interf
 	}
 
 	if col.Type.baseType != typeUnknown {
-		return typeText.derive(""), value
+		return typeText.derive("", ""), value
 	}
 
-	return typeUnknown.derive(""), value
+	return typeUnknown.derive("", ""), value
 }
 
 func parseTime(value string, layouts ...string) (time.Time, bool) {
