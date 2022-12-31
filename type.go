@@ -81,7 +81,7 @@ var implicitInputFormats map[baseType]string
 var implicitOutputFormats map[baseType]string
 
 func parseType(s string) (derivedType, error) {
-	declRE := regexp.MustCompile(`(text|number|datetime|date|time|bool)(?:\((.+?)(?:->(.+))?\))?`)
+	declRE := regexp.MustCompile(`(text|number|datetime|date|time|bool)(?:\((.*?)(?:->(.+))?\))?`)
 	subs := declRE.FindStringSubmatch(s)
 	if subs == nil {
 		return derivedType{}, fmt.Errorf("invalid type declaration %q", s)
