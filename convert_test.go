@@ -121,6 +121,12 @@ func TestGuess(t *testing.T) {
 		tst("Feb 4, 2008 4:45pm", "2008 02 04 16 45 00", "--columns", `#1:datetime(Jan 2\, 2006 3:04pm -> yyyy mm dd hh mm ss)`, "-d", ";")
 		tst("true", "true", "--columns", "#1:datetime")
 	})
+
+	// excelize do not evaluate formulas
+	t.Run("GuessFormula", func(t *testing.T) {
+		tst("=123", "" /*"123"*/)
+		tst("=max(1,2,3)*2", "" /*6"*/)
+	})
 }
 
 func TestMultiple(t *testing.T) {

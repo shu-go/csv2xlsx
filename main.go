@@ -350,6 +350,12 @@ func writeXlsx(f *excelize.File, sheet string, axis string, typ derivedType, val
 			return err
 		}
 
+	case typeFormula:
+		err := setCellFormulaAndStyle(f, sheet, axis, value, style)
+		if err != nil {
+			return err
+		}
+
 	default:
 		err := f.SetCellValue(sheet, axis, value)
 		if err != nil {
@@ -367,6 +373,9 @@ func (c globalCmd) guess(value string, col column) (derivedType, interface{}) {
 
 	if value[0] == '\'' || value[0] == '0' {
 		return typeText.derive("", ""), value
+	}
+	if value[0] == '=' {
+		return typeFormula.derive("", ""), value
 	}
 	if strings.ToLower(value) == "true" {
 		return typeBool.derive("", ""), true
@@ -434,6 +443,9 @@ func (c globalCmd) guessByColType(value string, col column) (derivedType, interf
 		if b, err := strconv.ParseBool(value); err == nil {
 			return col.Type, b
 		}
+
+	case typeFormula:
+		return col.Type, value
 
 	default: // nop
 	}
@@ -551,6 +563,27 @@ func defineStyle(f *excelize.File, s string) (int, error) {
 
 func setCellValueAndStyle(f *excelize.File, sheet, axis string, value interface{}, styleID int) error {
 	err := f.SetCellValue(sheet, axis, value)
+	if err != nil {
+		return err
+	}
+
+	err = f.SetCellStyle(sheet, axis, axis, styleID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func setCellFormulaAndStyle(f *excelize.File, sheet, axis string, formula interface{}, styleID int) error {
+	var fstr string
+	if s, ok := formula.(string); ok {
+		fstr = s
+	} else if s, ok := formula.(fmt.Stringer); ok {
+		fstr = s.String()
+	}
+
+	err := f.SetCellFormula(sheet, axis, fstr)
 	if err != nil {
 		return err
 	}
