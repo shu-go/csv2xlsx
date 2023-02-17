@@ -610,7 +610,7 @@ func main() {
 
 --columns [SHEET!]COLUMN_NAME:TYPE[(INPUT_FORMAT[->OUTPUT_FORMAT])]
   SHEET = CSV_FILENAME
-  TYPE = text|number|date|time|datetime|bool
+  TYPE = text | number | date | time | datetime | bool | formula
   INPUT_FORMAT
     date: yyyy, yy, y, 2006, 06, mm, m, 01, 1, dd, d, 02, 2
     time: hh, h, 15, 3, mm, m, 04, 4, ss, s, 05, 5
