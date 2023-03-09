@@ -197,9 +197,23 @@ func (c globalCmd) convert(oc outputContext) error {
 	return nil
 }
 
+func (c globalCmd) tempSheetName(oc outputContext) string {
+	name := "_CSV2XLSX_TEMP_"
+	for {
+		if idx, _ := oc.output.GetSheetIndex(name); idx == -1 {
+			return name
+		}
+
+		name += "a"
+	}
+}
+
 func (c globalCmd) convertOne(oc outputContext, sheet string, input io.Reader) error {
+	tempname := c.tempSheetName(oc)
+	oc.output.NewSheet(tempname)
 	oc.output.DeleteSheet(sheet)
 	oc.output.NewSheet(sheet)
+	oc.output.DeleteSheet(tempname)
 
 	r := csv.NewReader(input)
 	if len(c.Delimiter) > 0 {
