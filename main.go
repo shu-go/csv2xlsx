@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -380,6 +381,8 @@ func writeXlsx(f *excelize.File, sheet string, axis string, typ derivedType, val
 	return nil
 }
 
+var longNumRE = regexp.MustCompile(`\s*(\d+)(?:\.(\d+))?\s*`)
+
 func (c globalCmd) guess(value string, col column) (derivedType, interface{}) {
 	if typ, ival := c.guessByColType(value, col); typ.baseType != typeUnknown {
 		return typ, ival
@@ -416,6 +419,18 @@ func (c globalCmd) guess(value string, col column) (derivedType, interface{}) {
 	}
 
 	if f, err := strconv.ParseFloat(value, 64); err == nil {
+		if matches := longNumRE.FindStringSubmatch(value); len(matches) >= 2 {
+			if len(matches[1])+len(matches[2]) >= 16 {
+				return typeText.derive("", ""), value
+			}
+			if len(matches[1])+len(matches[2]) >= 12 {
+				if len(matches[2]) >= 1 {
+					return typeNumber.derive("", "0."+strings.Repeat("0", len(matches[2]))), f
+				} else {
+					return typeNumber.derive("", "0"), f
+				}
+			}
+		}
 		return typeNumber.derive("", ""), f
 	}
 

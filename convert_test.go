@@ -59,6 +59,25 @@ func TestAis1(t *testing.T) {
 	testValue(t, oc, "test.csv", "A2", "1")
 }
 
+func TestLongNumber(t *testing.T) {
+	cmd := dummyCmd()
+
+	oc, err := cmd.makeOutputContext(excelize.NewFile(), false)
+	gotwant.TestError(t, err, nil)
+	oc.inputs = []input{
+		newInput("test.csv", `a,b,c,d
+123456789012345,12345678901234567890,123456789012345,123456789012.123`),
+	}
+
+	err = cmd.convert(oc)
+	gotwant.TestError(t, err, nil)
+
+	testValue(t, oc, "test.csv", "A2", "123456789012345")
+	testValue(t, oc, "test.csv", "B2", "12345678901234567890")
+	testValue(t, oc, "test.csv", "C2", "123456789012345")
+	testValue(t, oc, "test.csv", "D2", "123456789012.123")
+}
+
 func TestGuess(t *testing.T) {
 	tst := func(content, value string, args ...string) {
 		t.Helper()
