@@ -13,7 +13,7 @@ import (
 	"encoding/csv"
 
 	"github.com/andrew-d/go-termutil"
-	"github.com/shu-go/gli"
+	"github.com/shu-go/gli/v2"
 	"github.com/xuri/excelize/v2"
 )
 
@@ -38,7 +38,7 @@ type globalCmd struct {
 
 	NumberXlsxFmt string `cli:"number-xlsx,nxf" default:""`
 
-	Columns gli.Map `cli:"columns,cols" help:"[SHEET!]COLUMN_NAME:TYPE[(INPUT_FORMAT[->OUTPUT_FORMAT])],..."`
+	Columns map[string]string `cli:"columns,cols" help:"[SHEET!]COLUMN_NAME:TYPE[(INPUT_FORMAT[->OUTPUT_FORMAT])],..."`
 
 	PipelinedName string `cli:"pipelined-name,name=SHEET_NAME" help:"the name of a pipelined CSV" default:"Sheet1"`
 }
