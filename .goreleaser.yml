@@ -1,48 +1,48 @@
 version: 2
 project_name: csv2xlsx
 env:
-  - GO111MODULE=on
+    - GO111MODULE=on
 before:
-  hooks:
-    - go mod tidy
+    hooks:
+        - go mod tidy
 builds:
-  - binary: csv2xlsx
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w
-      - -X main.Version={{.Version}}
-      - -X main.Revision={{.ShortCommit}}
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - windows
-      - darwin
-      - linux
-    goarch:
-      - amd64
-      - 386
+    - binary: csv2xlsx
+      flags:
+        - -trimpath
+      ldflags:
+        - -s -w
+        - -X main.Version={{.Version}}
+        - -X main.Revision={{.ShortCommit}}
+      env:
+        - CGO_ENABLED=0
+      goos:
+        - windows
+        - darwin
+        - linux
+      goarch:
+        - amd64
+        - 386
 upx:
-  - enabled: true
-    goos: [linux, windows]
-    lzma: true
+    - enabled: true
+      goos: [linux, windows]
+      lzma: true
 archives:
-  - name_template: '{{ .ProjectName }}_v{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
-    format_overrides:
-      - goos: windows
-        format: zip
+    - name_template: '{{ .ProjectName }}_v{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+      format_overrides:
+        - goos: windows
+          formats: ['zip']
 release:
-  prerelease: auto
+    prerelease: auto
 changelog:
-  filters:
-    exclude:
-    - '^test:'
-  groups:
-    - title: 'Features'
-      regexp: "^.*feat[(\\w)!]*:+.*$"
-      order: 0
-    - title: 'Bug fixes'
-      regexp: "^.*fix[(\\w)!]*:+.*$"
-      order: 1
-    - title: 'Others'
-      order: 999
+    filters:
+        exclude:
+            - '^test:'
+    groups:
+        - title: 'Features'
+          regexp: "^.*feat[(\\w)!]*:+.*$"
+          order: 0
+        - title: 'Bug fixes'
+          regexp: "^.*fix[(\\w)!]*:+.*$"
+          order: 1
+        - title: 'Others'
+          order: 999
